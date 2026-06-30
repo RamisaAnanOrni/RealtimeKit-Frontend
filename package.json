@@ -9,6 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@dytesdk/react-ui-kit": "^3.0.8",
+    "@dytesdk/react-web-core": "^3.1.11",
+    "@dytesdk/web-core": "^3.1.11",
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4"
