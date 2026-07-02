@@ -1,4 +1,4 @@
-const API_URL = "http://vetbackend.insurecow.com/api";
+const API_URL = "https://vetbackend.insurecow.com/api";
 
 export async function createMeeting() {
   const response = await fetch(`${API_URL}/create-meeting/`, {
