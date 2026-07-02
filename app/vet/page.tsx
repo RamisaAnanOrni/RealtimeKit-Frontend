@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useDyteClient } from "@dytesdk/react-web-core";
@@ -13,7 +13,7 @@ const DyteMeeting = dynamic(
   }
 );
 
-export default function VetPage() {
+function VetMeeting() {
   const searchParams = useSearchParams();
 
   const token = searchParams.get("token");
@@ -60,5 +60,28 @@ export default function VetPage() {
     >
       <DyteMeeting meeting={meeting} />
     </div>
+  );
+}
+
+export default function VetPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            height: "100vh",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            fontSize: 24,
+            fontWeight: "bold",
+          }}
+        >
+          Loading...
+        </div>
+      }
+    >
+      <VetMeeting />
+    </Suspense>
   );
 }

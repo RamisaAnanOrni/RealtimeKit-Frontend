@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useDyteClient } from "@dytesdk/react-web-core";
@@ -13,7 +13,7 @@ const DyteMeeting = dynamic(
   }
 );
 
-export default function FarmerPage() {
+function FarmerMeeting() {
   const searchParams = useSearchParams();
 
   const token = searchParams.get("token");
@@ -72,5 +72,28 @@ export default function FarmerPage() {
     <div style={{ height: "100vh" }}>
       <DyteMeeting meeting={meeting} />
     </div>
+  );
+}
+
+export default function FarmerPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            height: "100vh",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            fontSize: 24,
+            fontWeight: "bold",
+          }}
+        >
+          Loading...
+        </div>
+      }
+    >
+      <FarmerMeeting />
+    </Suspense>
   );
 }
