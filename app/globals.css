@@ -1,26 +1,54 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-primary: #063B2B;
+  --color-primary-light: #0A5240;
+  --color-primary-dark: #042A1E;
+  --color-teal: #0D9488;
+  --color-teal-light: #14B8A6;
+  --color-amber: #F59E0B;
+  --color-amber-light: #FCD34D;
+  --color-surface: #FFFFFF;
+  --color-background: #EFF4F2;
+  --color-background-alt: #E8EFEC;
+  --color-text: #1A2E28;
+  --color-text-secondary: #5F7A72;
+  --color-text-muted: #8FA8A0;
+  --color-border: #D1DDD8;
+  --color-border-light: #E5ECE9;
+  --color-success: #16A34A;
+  --color-error: #DC2626;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --background: #EFF4F2;
+  --foreground: #1A2E28;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+@keyframes spin-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 2s linear infinite;
 }
