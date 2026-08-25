@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { getStoredAuth, loginWithBackend, normalizeRole, registerWithBackend, saveAuth } from "@/lib/api";
 
 type Mode = "login" | "signup";
 type Role = "farmer" | "vet";
@@ -29,16 +30,43 @@ export default function AuthPanel() {
     setError("");
 
     const formData = new FormData(event.currentTarget);
-    formData.set("action", mode);
-    if (mode === "signup") formData.set("role", role);
+    const phone = (formData.get("phone") ?? "").toString().trim();
+    const password = (formData.get("password") ?? "").toString();
+    const fullName = (formData.get("fullName") ?? "").toString().trim();
 
     try {
-      const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: mode, phone: formData.get("phone"), password: formData.get("password"), fullName: formData.get("fullName"), role }) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message ?? "Something went wrong.");
-      setMessage(result.message);
-      if (mode === "login") window.location.assign(result.user?.role === "FARMER" ? "/dashboard" : "/");
-      if (mode === "signup") event.currentTarget.reset();
+      let result: any;
+
+      if (mode === "login") {
+        result = await loginWithBackend({ username: phone, password });
+      } else {
+        result = await registerWithBackend({ phone, fullName, password, role });
+      }
+
+      if (!result || result.detail || result.error) {
+        throw new Error(result?.detail ?? result?.message ?? result?.error ?? "Authentication failed");
+      }
+
+      const token = result.access ?? result.access_token;
+      if (!token) {
+        throw new Error("JWT token was not returned by the backend.");
+      }
+
+      const resolvedRole = normalizeRole(result.role ?? role);
+      const authPayload = {
+        access: token,
+        refresh: result.refresh,
+        role: resolvedRole,
+        username: result.username ?? (fullName || phone),
+      };
+
+      saveAuth(authPayload);
+      setMessage(mode === "login" ? "Login successful." : "Account created successfully.");
+
+      const destination = resolvedRole === "vet" ? "/vet/dashboard" : "/farmer/dashboard";
+      if (typeof window !== "undefined") {
+        window.location.assign(destination);
+      }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Something went wrong.");
     } finally {

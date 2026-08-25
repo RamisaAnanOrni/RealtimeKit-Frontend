@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export function middleware(request: NextRequest) {
-  if (!request.cookies.has("agrivet_access")) {
-    return NextResponse.redirect(new URL("/auth", request.url));
-  }
+export function middleware(_request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/dashboard/:path*"] };
+export const config = {
+  matcher: [],
+};
