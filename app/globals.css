@@ -18,6 +18,17 @@
   --color-border-light: #E5ECE9;
   --color-success: #16A34A;
   --color-error: #DC2626;
+  --color-on-surface: #1A2E28;
+  --color-on-surface-variant: #5F7A72;
+  --color-surface-border: #D1DDD8;
+  --color-surface-container-highest: #E8EFEC;
+  --color-primary-container: #0A5240;
+  --color-on-primary: #FFFFFF;
+  --color-primary-fixed: #D7F4E9;
+  --color-primary-fixed-dim: #B6DED0;
+  --color-on-primary-fixed: #063B2B;
+  --color-outline-variant: #8FA8A0;
+  --color-error-red: #DC2626;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
