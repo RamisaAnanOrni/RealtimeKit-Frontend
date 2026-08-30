@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bell, ClipboardCheck, Filter, HeartPulse, Leaf, Menu, PawPrint, PhoneCall, ShieldAlert, Star, Wheat, X } from "lucide-react";
 import { clearAuth, fetchJson, getStoredAuth } from "@/lib/api";
+import { useRoleProtection } from "@/hooks/useRoleProtection";
 
 type DashboardLog = {
   id: string;
@@ -40,6 +41,9 @@ export default function FarmerDashboardPage() {
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+
+  // Protect this route - only farmers can access
+  useRoleProtection("farmer");
 
   const showNotice = (message: string) => {
     setNotice(message);

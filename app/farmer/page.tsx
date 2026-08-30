@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useDyteClient } from "@dytesdk/react-web-core";
 import { ArrowRight, Beef, Bell, CalendarDays, ChevronRight, CircleUserRound, ClipboardCheck, Filter, HeartPulse, Leaf, Menu, PawPrint, PhoneCall, ShieldAlert, Star, Wheat, X } from "lucide-react";
+import { getFarmerDashboard, logout } from "@/lib/api";
 
 const DyteMeeting = dynamic(() => import("@dytesdk/react-ui-kit").then((mod) => mod.DyteMeeting), { ssr: false });
 
@@ -48,12 +49,12 @@ const livestock = [
 function DashboardNav() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  async function logout() { await fetch("/api/auth", { method: "DELETE" }); window.location.assign("/"); }
+  async function handleLogout() { await logout(); window.location.assign("/"); }
   return <header className="sticky top-0 z-20 border-b border-border-light bg-[#FBFCF9]/95 backdrop-blur"><div className="mx-auto flex h-[72px] max-w-[1240px] items-center justify-between px-5 sm:px-8 lg:px-10">
     <a href="#top" className="flex items-center gap-2.5 text-sm font-bold tracking-tight text-primary"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white"><Wheat className="h-4 w-4" /></span>Agricore <span className="font-medium text-text-secondary">VetCare</span></a>
     <nav className="hidden items-center gap-8 text-xs font-semibold text-text-secondary md:flex" aria-label="Main navigation"><a className="border-b-2 border-primary py-7 text-primary" href="#consultation">Tele-Health</a><a className="transition hover:text-primary" href="#livestock">My Livestock</a><a className="transition hover:text-primary" href="#rewards">Rewards</a></nav>
-    <div className="relative flex items-center gap-3"><button aria-label="Notifications" className="hidden rounded-full p-2 text-text-secondary hover:bg-background-alt hover:text-primary sm:block"><Bell className="h-[18px] w-[18px]" /></button><button aria-label="Open profile" onClick={() => setProfileOpen(!profileOpen)} className="hidden rounded-full p-2 text-text-secondary hover:bg-background-alt hover:text-primary sm:block"><CircleUserRound className="h-[18px] w-[18px]" /></button>{profileOpen && <div className="absolute right-28 top-12 z-30 w-36 rounded-xl border border-border-light bg-white p-2 shadow-lg"><button onClick={logout} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-[#C34A4A] hover:bg-[#FFF0F0]">Logout</button></div>}<button onClick={() => alert("Emergency call requested. A care coordinator will contact you shortly.")} className="hidden items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[11px] font-bold text-white shadow-sm hover:bg-primary-light sm:flex"><PhoneCall className="h-3.5 w-3.5" /> Emergency Call</button><button aria-label={menuOpen ? "Close menu" : "Open menu"} onClick={() => setMenuOpen(!menuOpen)} className="rounded-lg p-2 text-primary md:hidden">{menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button></div>
-  </div>{menuOpen && <div className="border-t border-border-light bg-surface px-5 py-3 md:hidden"><div className="flex flex-col gap-3 text-sm font-semibold text-primary"><a href="#consultation" onClick={() => setMenuOpen(false)}>Tele-Health</a><a href="#livestock" onClick={() => setMenuOpen(false)}>My Livestock</a><a href="#rewards" onClick={() => setMenuOpen(false)}>Rewards</a><button onClick={logout} className="border-t border-border-light pt-3 text-left text-[#C34A4A]">Logout</button></div></div>}</header>;
+    <div className="relative flex items-center gap-3"><button aria-label="Notifications" className="hidden rounded-full p-2 text-text-secondary hover:bg-background-alt hover:text-primary sm:block"><Bell className="h-[18px] w-[18px]" /></button><button aria-label="Open profile" onClick={() => setProfileOpen(!profileOpen)} className="hidden rounded-full p-2 text-text-secondary hover:bg-background-alt hover:text-primary sm:block"><CircleUserRound className="h-[18px] w-[18px]" /></button>{profileOpen && <div className="absolute right-28 top-12 z-30 w-36 rounded-xl border border-border-light bg-white p-2 shadow-lg"><button onClick={handleLogout} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-[#C34A4A] hover:bg-[#FFF0F0]">Logout</button></div>}<button onClick={() => alert("Emergency call requested. A care coordinator will contact you shortly.")} className="hidden items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[11px] font-bold text-white shadow-sm hover:bg-primary-light sm:flex"><PhoneCall className="h-3.5 w-3.5" /> Emergency Call</button><button aria-label={menuOpen ? "Close menu" : "Open menu"} onClick={() => setMenuOpen(!menuOpen)} className="rounded-lg p-2 text-primary md:hidden">{menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button></div>
+  </div>{menuOpen && <div className="border-t border-border-light bg-surface px-5 py-3 md:hidden"><div className="flex flex-col gap-3 text-sm font-semibold text-primary"><a href="#consultation" onClick={() => setMenuOpen(false)}>Tele-Health</a><a href="#livestock" onClick={() => setMenuOpen(false)}>My Livestock</a><a href="#rewards" onClick={() => setMenuOpen(false)}>Rewards</a><button onClick={handleLogout} className="border-t border-border-light pt-3 text-left text-[#C34A4A]">Logout</button></div></div>}</header>;
 }
 
 export function FarmerDashboard() {
@@ -63,13 +64,18 @@ export function FarmerDashboard() {
   const showNotice = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(""), 3500); };
 
   useEffect(() => {
-    fetch("/api/dashboard", { cache: "no-store" })
-      .then(async (response) => {
-        if (response.status === 401) { window.location.assign("/auth"); return; }
-        if (!response.ok) throw new Error("Unable to load dashboard.");
-        setDashboard(await response.json());
+    getFarmerDashboard()
+      .then((data) => {
+        setDashboard(data || emptyDashboard);
       })
-      .catch((error) => { console.error(error); showNotice("Dashboard data could not be loaded."); })
+      .catch((error) => {
+        console.error(error);
+        if (error instanceof Error && error.message.includes("401")) {
+          window.location.assign("/auth");
+          return;
+        }
+        showNotice("Dashboard data could not be loaded.");
+      })
       .finally(() => setLoadingDashboard(false));
   }, []);
 

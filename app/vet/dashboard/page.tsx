@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bell, CalendarDays, CheckCircle2, ClipboardList, HeartPulse, MessageSquareText, PhoneCall, ShieldCheck, Stethoscope, UserRoundCheck, XCircle } from "lucide-react";
 import { fetchJson, getStoredAuth } from "@/lib/api";
+import { useRoleProtection } from "@/hooks/useRoleProtection";
 
 type PendingRequest = {
   id: string | number;
@@ -23,6 +24,9 @@ export default function VetDashboardPage() {
   const [diagnosis, setDiagnosis] = useState("Mastitis and reduced appetite");
   const [medicine, setMedicine] = useState("Amoxicillin 20mg/kg");
   const [instructions, setInstructions] = useState("Administer once daily for 5 days. Continue hydration monitoring and reassess after 48 hours.");
+
+  // Protect this route - only vets can access
+  useRoleProtection("vet");
 
   useEffect(() => {
     const auth = getStoredAuth();

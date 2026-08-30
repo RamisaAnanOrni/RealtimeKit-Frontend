@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { getGuestRequest, GuestRequestResponse } from "../lib/guest-api";
+import { getGuestRequest, GuestRequestResponse } from "../lib/api";
 
 interface UsePollingOptions {
   intervalMs?: number;

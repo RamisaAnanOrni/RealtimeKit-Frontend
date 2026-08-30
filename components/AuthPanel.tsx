@@ -40,30 +40,63 @@ export default function AuthPanel() {
       if (mode === "login") {
         result = await loginWithBackend({ username: phone, password });
       } else {
-        result = await registerWithBackend({ phone, fullName, password, role });
+        // Normalize role to UPPERCASE for backend (VET or FARMER)
+        const normalizedRole = role === "vet" ? "VET" : "FARMER";
+        
+        const signupPayload = { phone, fullName, password, role: normalizedRole };
+        console.log("[AuthPanel] Signup Payload:", signupPayload);
+        
+        result = await registerWithBackend(signupPayload as any);
       }
 
       if (!result || result.detail || result.error) {
         throw new Error(result?.detail ?? result?.message ?? result?.error ?? "Authentication failed");
       }
 
+      // For signup, no JWT token is returned - redirect to login
+      if (mode === "signup") {
+        setMessage("Account created successfully! Please log in with your phone number and password.");
+        // Automatically switch to login mode after a brief delay
+        setTimeout(() => {
+          switchMode("login");
+        }, 1500);
+        setLoading(false);
+        return;
+      }
+
+      // For login, expect JWT token
       const token = result.access ?? result.access_token;
       if (!token) {
         throw new Error("JWT token was not returned by the backend.");
       }
 
-      const resolvedRole = normalizeRole(result.role ?? role);
+      // Extract role from backend response (explicit and required for login)
+      const backendRole = result.role;
+      console.log("[AuthPanel] Login response - role from backend:", backendRole);
+
+      const resolvedRole = normalizeRole(backendRole || "farmer");
+      console.log("[AuthPanel] Resolved role:", resolvedRole);
+
       const authPayload = {
         access: token,
         refresh: result.refresh,
-        role: resolvedRole,
-        username: result.username ?? (fullName || phone),
+        role: resolvedRole, // IMPORTANT: Store normalized role
+        username: result.username ?? phone,
       };
 
+      console.log("[AuthPanel] Saving auth payload:", {
+        access: token ? "***[token]***" : "MISSING",
+        refresh: result.refresh ? "***[token]***" : "MISSING",
+        role: authPayload.role,
+        username: authPayload.username,
+      });
+
       saveAuth(authPayload);
-      setMessage(mode === "login" ? "Login successful." : "Account created successfully.");
+      setMessage("Login successful.");
 
       const destination = resolvedRole === "vet" ? "/vet/dashboard" : "/farmer/dashboard";
+      console.log("[AuthPanel] Redirecting to:", destination);
+
       if (typeof window !== "undefined") {
         window.location.assign(destination);
       }

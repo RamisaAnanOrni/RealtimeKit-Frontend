@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { submitGuestRequest } from "../../lib/guest-api";
+import { submitGuestRequest } from "@/lib/api";
 import { useGuestRequestPolling } from "../../hooks/useGuestRequestPolling";
 import GuestForm from "../../components/GuestForm";
 import StatusCard from "../../components/StatusCard";

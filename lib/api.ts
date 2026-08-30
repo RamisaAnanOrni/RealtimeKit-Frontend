@@ -1,4 +1,11 @@
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://194.238.22.134:8000/api";
+/**
+ * CORE API SERVICE MODULE
+ * Handles all direct Django REST API communication.
+ * NO Next.js API routes - Direct browser → Django backend only.
+ */
+
+export const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000/api";
+export const STATIC_API_KEY = process.env.NEXT_PUBLIC_STATIC_API_KEY || "agrivet-secret-lifetime-key-2026";
 
 export type AuthRecord = {
   access: string;
@@ -6,6 +13,36 @@ export type AuthRecord = {
   role?: string;
   username?: string;
 };
+
+export type ApiErrorResponse = {
+  detail?: string;
+  message?: string;
+  error?: string;
+  non_field_errors?: string[];
+  [key: string]: any;
+};
+
+export type GuestRequestResponse = {
+  request_id: number;
+  status: "PENDING" | "MEETING_CREATED";
+  problem: string;
+  phone?: string;
+  message: string;
+  farmer_join_link?: string;
+};
+
+export type GuestSubmitResponse = {
+  success: boolean;
+  request_id: number;
+  status: string;
+  message: string;
+  phone: string;
+  problem: string;
+};
+
+// ============================================================================
+// AUTH MANAGEMENT
+// ============================================================================
 
 export function normalizeRole(role?: string): "farmer" | "vet" {
   const value = (role ?? "").toString().trim().toLowerCase();
@@ -34,18 +71,49 @@ export function clearAuth() {
   window.localStorage.removeItem("agrivet_auth");
 }
 
+export function getAuthToken(): string | null {
+  const auth = getStoredAuth();
+  return auth?.access || null;
+}
+
+// ============================================================================
+// HEADERS & REQUEST UTILITIES
+// ============================================================================
+
 export function getAuthHeaders(includeJson = true): Record<string, string> {
   const headers: Record<string, string> = {};
   if (includeJson) headers["Content-Type"] = "application/json";
+  
+  // Add Authorization Bearer token
   const auth = getStoredAuth();
   if (auth?.access) {
     headers.Authorization = `Bearer ${auth.access}`;
   }
+  
+  // Add static API key if needed
+  if (STATIC_API_KEY) {
+    headers["X-API-KEY"] = STATIC_API_KEY;
+  }
+  
   return headers;
 }
 
-export async function fetchJson<T>(path: string, options: RequestInit = {}, withAuth = true): Promise<T> {
-  const url = path.startsWith("http") ? path : `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+export function buildUrl(path: string): string {
+  if (path.startsWith("http")) return path;
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${API_BASE_URL}${cleanPath}`;
+}
+
+// ============================================================================
+// GENERIC FETCH UTILITY
+// ============================================================================
+
+export async function fetchJson<T>(
+  path: string,
+  options: RequestInit = {},
+  withAuth = true
+): Promise<T> {
+  const url = buildUrl(path);
   const headers = new Headers(options.headers ?? {});
 
   if (withAuth) {
@@ -105,8 +173,319 @@ export async function registerWithBackend({ phone, fullName, password, role }: {
   throw lastError ?? new Error("Unable to create account.");
 }
 
+// ============================================================================
+// AUTHENTICATION ENDPOINTS
+// ============================================================================
+
+export async function login(username: string, password: string) {
+  const response = await fetchJson<{ 
+    access?: string; 
+    refresh?: string; 
+    role?: string; 
+    username?: string; 
+    detail?: string; 
+    message?: string; 
+  }>(
+    "/auth/login/",
+    {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+      headers: getAuthHeaders(),
+    },
+    false,
+  );
+  return response;
+}
+
+export async function register(data: {
+  phone: string;
+  fullName: string;
+  password: string;
+  role: string;
+}) {
+  const endpoints = ["/auth/register/", "/auth/signup/"];
+  let lastError: Error | null = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetchJson<{
+        success?: boolean;
+        message?: string;
+        access?: string;
+        refresh?: string;
+        role?: string;
+        username?: string;
+        detail?: string;
+      }>(
+        endpoint,
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+          headers: getAuthHeaders(),
+        },
+        false,
+      );
+      return response;
+    } catch (error) {
+      lastError = error as Error;
+    }
+  }
+
+  throw lastError ?? new Error("Unable to create account.");
+}
+
+export async function logout() {
+  clearAuth();
+  return { success: true };
+}
+
+// ============================================================================
+// FARMER ENDPOINTS (Dashboard, Profile, Requests)
+// ============================================================================
+
+export async function getFarmerDashboard() {
+  return fetchJson<any>(
+    "/farmer/dashboard/",
+    { method: "GET" },
+    true,
+  );
+}
+
+export async function getFarmerProfile() {
+  return fetchJson<any>(
+    "/farmer/profile/",
+    { method: "GET" },
+    true,
+  );
+}
+
+export async function updateFarmerProfile(data: any) {
+  return fetchJson<any>(
+    "/farmer/profile/",
+    {
+      method: "PUT",
+      body: JSON.stringify(data),
+      headers: getAuthHeaders(),
+    },
+    true,
+  );
+}
+
+export async function getFarmerRequests() {
+  return fetchJson<any>(
+    "/farmer/requests/",
+    { method: "GET" },
+    true,
+  );
+}
+
+export async function getFarmerRequest(requestId: number) {
+  return fetchJson<any>(
+    `/farmer/requests/${requestId}/`,
+    { method: "GET" },
+    true,
+  );
+}
+
+// ============================================================================
+// VET ENDPOINTS (Dashboard, Profile, Consultations)
+// ============================================================================
+
+export async function getVetDashboard() {
+  return fetchJson<any>(
+    "/vet/dashboard/",
+    { method: "GET" },
+    true,
+  );
+}
+
+export async function getVetProfile() {
+  return fetchJson<any>(
+    "/vet/profile/",
+    { method: "GET" },
+    true,
+  );
+}
+
+export async function updateVetProfile(data: any) {
+  return fetchJson<any>(
+    "/vet/profile/",
+    {
+      method: "PUT",
+      body: JSON.stringify(data),
+      headers: getAuthHeaders(),
+    },
+    true,
+  );
+}
+
+export async function getVetConsultations() {
+  return fetchJson<any>(
+    "/vet/consultations/",
+    { method: "GET" },
+    true,
+  );
+}
+
+export async function getVetConsultation(consultationId: number) {
+  return fetchJson<any>(
+    `/vet/consultations/${consultationId}/`,
+    { method: "GET" },
+    true,
+  );
+}
+
+// ============================================================================
+// MEETING/VIDEO CALL ENDPOINTS
+// ============================================================================
+
 export async function createMeeting() {
-  return fetchJson<{ success?: boolean; meeting?: unknown; farmer?: unknown; vet?: unknown }>("/meeting/create/", {
-    method: "POST",
-  });
+  return fetchJson<{ 
+    success?: boolean; 
+    meeting?: any; 
+    farmer?: any; 
+    vet?: any 
+  }>(
+    "/meeting/create/",
+    { method: "POST", headers: getAuthHeaders() },
+    true,
+  );
+}
+
+export async function getMeeting(meetingId: string | number) {
+  return fetchJson<any>(
+    `/meeting/${meetingId}/`,
+    { method: "GET" },
+    true,
+  );
+}
+
+export async function updateMeetingStatus(
+  meetingId: string | number,
+  status: string,
+) {
+  return fetchJson<any>(
+    `/meeting/${meetingId}/update-status/`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ status }),
+      headers: getAuthHeaders(),
+    },
+    true,
+  );
+}
+
+// ============================================================================
+// GUEST REQUEST ENDPOINTS
+// ============================================================================
+
+export async function submitGuestRequest(phone: string, problem: string) {
+  return fetchJson<{
+    success?: boolean;
+    request_id?: number;
+    status?: string;
+    message?: string;
+    phone?: string;
+    problem?: string;
+    farmer_join_link?: string;
+  }>(
+    "/guest/request/",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        phone: phone.replace(/[^\d+]/g, ""),
+        problem,
+      }),
+      headers: getAuthHeaders(),
+    },
+    false,
+  );
+}
+
+export async function getGuestRequest(requestId: number | string) {
+  return fetchJson<any>(
+    `/guest/request/${requestId}/`,
+    { method: "GET" },
+    false,
+  );
+}
+
+export async function pollGuestRequest(requestId: number | string) {
+  return fetchJson<any>(
+    `/guest/request/${requestId}/poll/`,
+    { method: "GET" },
+    false,
+  );
+}
+
+// ============================================================================
+// JWT DECODING & PROFILE FETCHING
+// ============================================================================
+
+/**
+ * Decode JWT payload without verification
+ * Used to extract role from token if stored role is missing/invalid
+ */
+export function decodeJwt(token: string): Record<string, any> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+
+    const decoded = JSON.parse(
+      Buffer.from(parts[1], "base64").toString("utf-8")
+    );
+    return decoded;
+  } catch {
+    console.error("[JWT Decode] Failed to decode JWT");
+    return null;
+  }
+}
+
+/**
+ * Fetch user profile directly from backend
+ * Used as fallback when role is missing from stored auth
+ */
+export async function fetchUserProfile(): Promise<{ role?: string; username?: string; id?: number } | null> {
+  try {
+    const auth = getStoredAuth();
+    if (!auth?.access) {
+      console.warn("[Profile Fetch] No auth token available");
+      return null;
+    }
+
+    const profile = await fetchJson<{ role?: string; username?: string; id?: number }>(
+      "/profile/",
+      { method: "GET" },
+      true // Use auth
+    );
+
+    console.log("[Profile Fetch] Success:", { role: profile?.role, username: profile?.username });
+    return profile || null;
+  } catch (error) {
+    console.error("[Profile Fetch] Failed:", error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
+// ============================================================================
+// ERROR HANDLING UTILITY
+// ============================================================================
+
+export function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (error && typeof error === "object") {
+    const err = error as any;
+    return (
+      err.detail ??
+      err.message ??
+      err.error ??
+      JSON.stringify(error)
+    );
+  }
+  return "An unexpected error occurred";
 }
