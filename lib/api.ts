@@ -4,7 +4,7 @@
  * NO Next.js API routes - Direct browser → Django backend only.
  */
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000/api";
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000/api").replace(/\/$/, "");
 export const STATIC_API_KEY = process.env.NEXT_PUBLIC_STATIC_API_KEY || "agrivet-secret-lifetime-key-2026";
 
 export type AuthRecord = {
@@ -84,13 +84,11 @@ export function getAuthHeaders(includeJson = true): Record<string, string> {
   const headers: Record<string, string> = {};
   if (includeJson) headers["Content-Type"] = "application/json";
   
-  // Add Authorization Bearer token
   const auth = getStoredAuth();
   if (auth?.access) {
     headers.Authorization = `Bearer ${auth.access}`;
   }
   
-  // Add static API key if needed
   if (STATIC_API_KEY) {
     headers["X-API-KEY"] = STATIC_API_KEY;
   }
@@ -123,6 +121,10 @@ export async function fetchJson<T>(
     }
   }
 
+  if (STATIC_API_KEY && !headers.has("X-API-KEY")) {
+    headers.set("X-API-KEY", STATIC_API_KEY);
+  }
+
   if (options.body && !headers.has("Content-Type") && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
@@ -139,6 +141,10 @@ export async function fetchJson<T>(
   return data as T;
 }
 
+// ============================================================================
+// AUTHENTICATION ENDPOINTS
+// ============================================================================
+
 export async function loginWithBackend({ username, password }: { username: string; password: string }) {
   return fetchJson<{ access?: string; refresh?: string; role?: string; username?: string; detail?: string; message?: string; }>(
     "/auth/login/",
@@ -152,7 +158,6 @@ export async function loginWithBackend({ username, password }: { username: strin
 
 export async function registerWithBackend({ phone, fullName, password, role }: { phone: string; fullName: string; password: string; role: string }) {
   const candidateEndpoints = ["/auth/register/", "/auth/signup/"];
-
   let lastError: Error | null = null;
 
   for (const endpoint of candidateEndpoints) {
@@ -173,12 +178,8 @@ export async function registerWithBackend({ phone, fullName, password, role }: {
   throw lastError ?? new Error("Unable to create account.");
 }
 
-// ============================================================================
-// AUTHENTICATION ENDPOINTS
-// ============================================================================
-
 export async function login(username: string, password: string) {
-  const response = await fetchJson<{ 
+  return fetchJson<{ 
     access?: string; 
     refresh?: string; 
     role?: string; 
@@ -190,11 +191,9 @@ export async function login(username: string, password: string) {
     {
       method: "POST",
       body: JSON.stringify({ username, password }),
-      headers: getAuthHeaders(),
     },
     false,
   );
-  return response;
 }
 
 export async function register(data: {
@@ -203,35 +202,7 @@ export async function register(data: {
   password: string;
   role: string;
 }) {
-  const endpoints = ["/auth/register/", "/auth/signup/"];
-  let lastError: Error | null = null;
-
-  for (const endpoint of endpoints) {
-    try {
-      const response = await fetchJson<{
-        success?: boolean;
-        message?: string;
-        access?: string;
-        refresh?: string;
-        role?: string;
-        username?: string;
-        detail?: string;
-      }>(
-        endpoint,
-        {
-          method: "POST",
-          body: JSON.stringify(data),
-          headers: getAuthHeaders(),
-        },
-        false,
-      );
-      return response;
-    } catch (error) {
-      lastError = error as Error;
-    }
-  }
-
-  throw lastError ?? new Error("Unable to create account.");
+  return registerWithBackend(data);
 }
 
 export async function logout() {
@@ -240,23 +211,15 @@ export async function logout() {
 }
 
 // ============================================================================
-// FARMER ENDPOINTS (Dashboard, Profile, Requests)
+// FARMER ENDPOINTS
 // ============================================================================
 
 export async function getFarmerDashboard() {
-  return fetchJson<any>(
-    "/farmer/dashboard/",
-    { method: "GET" },
-    true,
-  );
+  return fetchJson<any>("/farmer/dashboard/", { method: "GET" }, true);
 }
 
 export async function getFarmerProfile() {
-  return fetchJson<any>(
-    "/farmer/profile/",
-    { method: "GET" },
-    true,
-  );
+  return fetchJson<any>("/farmer/profile/", { method: "GET" }, true);
 }
 
 export async function updateFarmerProfile(data: any) {
@@ -265,46 +228,29 @@ export async function updateFarmerProfile(data: any) {
     {
       method: "PUT",
       body: JSON.stringify(data),
-      headers: getAuthHeaders(),
     },
     true,
   );
 }
 
 export async function getFarmerRequests() {
-  return fetchJson<any>(
-    "/farmer/requests/",
-    { method: "GET" },
-    true,
-  );
+  return fetchJson<any>("/farmer/requests/", { method: "GET" }, true);
 }
 
 export async function getFarmerRequest(requestId: number) {
-  return fetchJson<any>(
-    `/farmer/requests/${requestId}/`,
-    { method: "GET" },
-    true,
-  );
+  return fetchJson<any>(`/farmer/requests/${requestId}/`, { method: "GET" }, true);
 }
 
 // ============================================================================
-// VET ENDPOINTS (Dashboard, Profile, Consultations)
+// VET ENDPOINTS
 // ============================================================================
 
 export async function getVetDashboard() {
-  return fetchJson<any>(
-    "/vet/dashboard/",
-    { method: "GET" },
-    true,
-  );
+  return fetchJson<any>("/vet/dashboard/", { method: "GET" }, true);
 }
 
 export async function getVetProfile() {
-  return fetchJson<any>(
-    "/vet/profile/",
-    { method: "GET" },
-    true,
-  );
+  return fetchJson<any>("/vet/profile/", { method: "GET" }, true);
 }
 
 export async function updateVetProfile(data: any) {
@@ -313,26 +259,17 @@ export async function updateVetProfile(data: any) {
     {
       method: "PUT",
       body: JSON.stringify(data),
-      headers: getAuthHeaders(),
     },
     true,
   );
 }
 
 export async function getVetConsultations() {
-  return fetchJson<any>(
-    "/vet/consultations/",
-    { method: "GET" },
-    true,
-  );
+  return fetchJson<any>("/vet/consultations/", { method: "GET" }, true);
 }
 
 export async function getVetConsultation(consultationId: number) {
-  return fetchJson<any>(
-    `/vet/consultations/${consultationId}/`,
-    { method: "GET" },
-    true,
-  );
+  return fetchJson<any>(`/vet/consultations/${consultationId}/`, { method: "GET" }, true);
 }
 
 // ============================================================================
@@ -347,17 +284,13 @@ export async function createMeeting() {
     vet?: any 
   }>(
     "/meeting/create/",
-    { method: "POST", headers: getAuthHeaders() },
+    { method: "POST" },
     true,
   );
 }
 
 export async function getMeeting(meetingId: string | number) {
-  return fetchJson<any>(
-    `/meeting/${meetingId}/`,
-    { method: "GET" },
-    true,
-  );
+  return fetchJson<any>(`/meeting/${meetingId}/`, { method: "GET" }, true);
 }
 
 export async function updateMeetingStatus(
@@ -369,14 +302,13 @@ export async function updateMeetingStatus(
     {
       method: "PUT",
       body: JSON.stringify({ status }),
-      headers: getAuthHeaders(),
     },
     true,
   );
 }
 
 // ============================================================================
-// GUEST REQUEST ENDPOINTS
+// GUEST REQUEST ENDPOINTS (FIXED - NO AUTH REQUIREMENT)
 // ============================================================================
 
 export async function submitGuestRequest(phone: string, problem: string) {
@@ -396,16 +328,15 @@ export async function submitGuestRequest(phone: string, problem: string) {
         phone: phone.replace(/[^\d+]/g, ""),
         problem,
       }),
-      headers: getAuthHeaders(),
     },
-    false,
+    false, // explicitly disable auth
   );
 }
 
 export async function getGuestRequest(requestId: number | string) {
   return fetchJson<any>(
     `/guest/request/${requestId}/`,
-    { method: "GET" },
+    { method: "GET", cache: "no-store" },
     false,
   );
 }
@@ -413,7 +344,7 @@ export async function getGuestRequest(requestId: number | string) {
 export async function pollGuestRequest(requestId: number | string) {
   return fetchJson<any>(
     `/guest/request/${requestId}/poll/`,
-    { method: "GET" },
+    { method: "GET", cache: "no-store" },
     false,
   );
 }
@@ -422,10 +353,6 @@ export async function pollGuestRequest(requestId: number | string) {
 // JWT DECODING & PROFILE FETCHING
 // ============================================================================
 
-/**
- * Decode JWT payload without verification
- * Used to extract role from token if stored role is missing/invalid
- */
 export function decodeJwt(token: string): Record<string, any> | null {
   try {
     const parts = token.split(".");
@@ -441,10 +368,6 @@ export function decodeJwt(token: string): Record<string, any> | null {
   }
 }
 
-/**
- * Fetch user profile directly from backend
- * Used as fallback when role is missing from stored auth
- */
 export async function fetchUserProfile(): Promise<{ role?: string; username?: string; id?: number } | null> {
   try {
     const auth = getStoredAuth();
@@ -456,7 +379,7 @@ export async function fetchUserProfile(): Promise<{ role?: string; username?: st
     const profile = await fetchJson<{ role?: string; username?: string; id?: number }>(
       "/profile/",
       { method: "GET" },
-      true // Use auth
+      true
     );
 
     console.log("[Profile Fetch] Success:", { role: profile?.role, username: profile?.username });
