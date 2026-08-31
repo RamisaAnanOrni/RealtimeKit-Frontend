@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { submitGuestRequest } from "@/lib/api";
+import { submitGuestRequest } from "../../lib/guest-api";
 import { useGuestRequestPolling } from "../../hooks/useGuestRequestPolling";
 import GuestForm from "../../components/GuestForm";
 import StatusCard from "../../components/StatusCard";
@@ -46,8 +46,11 @@ export default function GuestPage() {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  const { data: pollData, error: pollError, retry: retryPoll } =
-    useGuestRequestPolling(formData?.requestId ?? null);
+  const {
+    data: pollData,
+    error: pollError,
+    retry: retryPoll,
+  } = useGuestRequestPolling(formData?.requestId ?? null);
 
   const meetingReady = pollData?.status === "MEETING_CREATED";
   const showSuccessNow = showSuccessModal && !meetingReady;
@@ -65,6 +68,7 @@ export default function GuestPage() {
         const result = await submitGuestRequest(phone, fullProblem);
 
         if (
+          result.message &&
           result.message.toLowerCase().includes("already have an open request")
         ) {
           const stored: StoredRequest = {
@@ -89,13 +93,13 @@ export default function GuestPage() {
         setScreen("status");
       } catch (err) {
         setSubmitError(
-          err instanceof Error ? err.message : "Something went wrong."
+          err instanceof Error ? err.message : "Something went wrong.",
         );
       } finally {
         setIsSubmitting(false);
       }
     },
-    []
+    [],
   );
 
   const handleBack = useCallback(() => {
@@ -176,7 +180,10 @@ export default function GuestPage() {
         )}
 
         {pollError && (
-          <div className="mt-4 rounded-xl border border-error/20 bg-error/5 p-4 text-sm text-error" role="alert">
+          <div
+            className="mt-4 rounded-xl border border-error/20 bg-error/5 p-4 text-sm text-error"
+            role="alert"
+          >
             <p className="mb-2 font-medium">{pollError}</p>
             <button
               onClick={retryPoll}

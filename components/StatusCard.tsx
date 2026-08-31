@@ -1,14 +1,7 @@
 "use client";
 
 import React from "react";
-import {
-  Phone,
-  FileText,
-  Video,
-  Clock,
-  CheckCircle2,
-  Loader2,
-} from "lucide-react";
+import { Clock, Video, Phone, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface StatusCardProps {
   status: "pending" | "ready";
@@ -27,116 +20,72 @@ export default function StatusCard({
   message,
   onJoin,
 }: StatusCardProps) {
-  const isReady = status === "ready";
-
   return (
-    <div className="space-y-4">
-      {/* Summary card */}
-      <div className="rounded-2xl border border-border-light bg-surface p-5 shadow-sm">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-widest text-text-muted">
-          Consultation Summary
-        </div>
-        <div className="space-y-2.5">
+    <div className="w-full space-y-4">
+      {/* Banner / Header Status */}
+      {status === "pending" ? (
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-5 text-amber-900 dark:text-amber-200">
           <div className="flex items-start gap-3">
-            <FileText className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
+            <Clock className="mt-0.5 h-6 w-6 shrink-0 animate-pulse text-amber-600 dark:text-amber-400" />
             <div>
-              <div className="text-xs font-medium uppercase tracking-wide text-text-muted">Problem</div>
-              <div className="text-sm font-medium text-text">{problem}</div>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <Phone className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wide text-text-muted">Phone</div>
-              <div className="text-sm font-medium text-text">{phone}</div>
+              <h3 className="text-base font-semibold">Waiting for a Veterinarian</h3>
+              <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-300/80 leading-relaxed">
+                Your consultation request has been received. A doctor will review your case and connect shortly.
+              </p>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Status card */}
-      <div className="rounded-2xl border border-border-light bg-surface p-6 shadow-sm">
-        <div className="flex flex-col items-center text-center">
-          {/* Status icon */}
-          {isReady ? (
-            <div className="relative mb-5">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
-                <CheckCircle2 className="h-8 w-8 text-success" />
-              </div>
+      ) : (
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5 text-emerald-900 dark:text-emerald-200">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <div>
+              <h3 className="text-base font-semibold">Doctor is Ready!</h3>
+              <p className="mt-1 text-xs text-emerald-800/80 dark:text-emerald-300/80 leading-relaxed">
+                {message || "A veterinarian is ready to start your consultation session."}
+              </p>
             </div>
-          ) : (
-            <div className="relative mb-5">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="h-16 w-16 rounded-full border-2 border-amber/30 animate-pulse-ring" />
-              </div>
-              <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-amber/10">
-                <Loader2 className="h-7 w-7 text-amber animate-spin-slow" />
-              </div>
-            </div>
-          )}
-
-          {/* Badge */}
-          <div
-            className={`mb-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider ${
-              isReady
-                ? "bg-success/10 text-success"
-                : "bg-amber/10 text-amber"
-            }`}
-          >
-            {isReady ? (
-              <>
-                <CheckCircle2 className="h-3 w-3" />
-                Link Ready
-              </>
-            ) : (
-              <>
-                <Clock className="h-3 w-3" />
-                Pending
-              </>
-            )}
           </div>
+        </div>
+      )}
 
-          {/* Message */}
-          {isReady ? (
-            <div className="mb-5 space-y-1">
-              {vetName && (
-                <p className="text-base font-semibold text-text">
-                  Dr. {vetName}
-                </p>
-              )}
-              <p className="text-sm text-text-secondary">
-                {message || "A veterinarian is ready. Join the consultation using the link below."}
-              </p>
-            </div>
-          ) : (
-            <div className="mb-5">
-              <p className="text-base font-semibold text-text">
-                Waiting for a moment...
-              </p>
-              <p className="mt-1 text-sm text-text-secondary">
-                A vet will join within minutes
-              </p>
-            </div>
-          )}
+      {/* Details Box */}
+      <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-4">
+        <div>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+            Request Details
+          </span>
+          <p className="mt-1 text-base font-medium text-text">{problem}</p>
+        </div>
 
-          {/* Join button */}
-          {isReady && onJoin && (
+        <div className="grid grid-cols-2 gap-4 border-t border-border-light pt-4">
+          <div>
+            <span className="text-xs font-semibold text-text-secondary">Phone Number</span>
+            <p className="mt-0.5 text-sm font-medium text-text flex items-center gap-1.5">
+              <Phone className="h-3.5 w-3.5 text-text-muted" />
+              {phone}
+            </p>
+          </div>
+          <div>
+            <span className="text-xs font-semibold text-text-secondary">Assigned Vet</span>
+            <p className="mt-0.5 text-sm font-medium text-text">
+              {vetName || "Assigning..."}
+            </p>
+          </div>
+        </div>
+
+        {/* Action Button */}
+        {status === "ready" && onJoin && (
+          <div className="pt-2">
             <button
               onClick={onJoin}
-              className="group flex w-full items-center justify-center gap-2.5 rounded-xl bg-teal px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-light focus:outline-none focus:ring-2 focus:ring-teal focus:ring-offset-2"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-semibold text-white shadow-md transition hover:bg-primary-light focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <Video className="h-4 w-4" />
-              JOIN CALL
+              JOIN VIDEO CALL
             </button>
-          )}
-
-          {!isReady && (
-            <div className="flex items-center gap-2 rounded-xl bg-background-alt px-4 py-3 text-xs text-text-muted">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Checking for updates every 5 seconds
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
