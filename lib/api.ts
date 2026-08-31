@@ -4,8 +4,15 @@
  * NO Next.js API routes - Direct browser → Django backend only.
  */
 
-export const API_BASE_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000/api").replace(/\/$/, "");
-export const STATIC_API_KEY = process.env.NEXT_PUBLIC_STATIC_API_KEY || "agrivet-secret-lifetime-key-2026";
+// env ফাইল না বদলে NEXT_PUBLIC_BACKEND_URL অথবা NEXT_PUBLIC_API_BASE_URL থেকে URL ধরে নিবে
+export const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "http://localhost:8000/api"
+).replace(/\/+$/, "");
+
+export const STATIC_API_KEY =
+  process.env.NEXT_PUBLIC_STATIC_API_KEY || "agrivet-secret-lifetime-key-2026";
 
 export type AuthRecord = {
   access: string;
@@ -83,16 +90,16 @@ export function getAuthToken(): string | null {
 export function getAuthHeaders(includeJson = true): Record<string, string> {
   const headers: Record<string, string> = {};
   if (includeJson) headers["Content-Type"] = "application/json";
-  
+
   const auth = getStoredAuth();
   if (auth?.access) {
     headers.Authorization = `Bearer ${auth.access}`;
   }
-  
+
   if (STATIC_API_KEY) {
     headers["X-API-KEY"] = STATIC_API_KEY;
   }
-  
+
   return headers;
 }
 
@@ -157,25 +164,15 @@ export async function loginWithBackend({ username, password }: { username: strin
 }
 
 export async function registerWithBackend({ phone, fullName, password, role }: { phone: string; fullName: string; password: string; role: string }) {
-  const candidateEndpoints = ["/auth/register/", "/auth/signup/"];
-  let lastError: Error | null = null;
-
-  for (const endpoint of candidateEndpoints) {
-    try {
-      return await fetchJson<{ success?: boolean; message?: string; access?: string; refresh?: string; role?: string; username?: string; detail?: string }>(
-        endpoint,
-        {
-          method: "POST",
-          body: JSON.stringify({ phone, fullName, password, role }),
-        },
-        false,
-      );
-    } catch (error) {
-      lastError = error as Error;
-    }
-  }
-
-  throw lastError ?? new Error("Unable to create account.");
+  // ডাইরেক্ট এন্ডপয়েন্ট কল
+  return fetchJson<{ success?: boolean; message?: string; access?: string; refresh?: string; role?: string; username?: string; detail?: string }>(
+    "/auth/signup/",
+    {
+      method: "POST",
+      body: JSON.stringify({ phone, fullName, password, role }),
+    },
+    false,
+  );
 }
 
 export async function login(username: string, password: string) {

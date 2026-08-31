@@ -4,7 +4,15 @@
  * Direct Django backend calls only - NO Next.js API routes.
  */
 
-import { API_BASE_URL, STATIC_API_KEY, fetchJson, getAuthHeaders, saveAuth, clearAuth, AuthRecord } from "./api";
+import {
+  API_BASE_URL,
+  STATIC_API_KEY,
+  fetchJson,
+  getAuthHeaders,
+  saveAuth,
+  clearAuth,
+  AuthRecord,
+} from "./api";
 
 // ============================================================================
 // USER LOGIN
@@ -31,7 +39,7 @@ export async function userLogin(payload: LoginRequest): Promise<LoginResponse> {
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     },
-    false, // No auth needed for login
+    false // No auth needed for login
   );
 
   // Save credentials to localStorage
@@ -69,42 +77,29 @@ export interface SignupResponse {
 
 /**
  * Register new user with Django backend
- * Attempts both /auth/signup/ and /auth/register/ endpoints
  */
 export async function userSignup(payload: SignupRequest): Promise<SignupResponse> {
-  const endpoints = ["/auth/signup/", "/auth/register/"];
-  let lastError: Error | null = null;
+  const response = await fetchJson<SignupResponse>(
+    "/auth/signup/",
+    {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    },
+    false
+  );
 
-  for (const endpoint of endpoints) {
-    try {
-      const response = await fetchJson<SignupResponse>(
-        endpoint,
-        {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload),
-        },
-        false,
-      );
-
-      // Auto-login after successful signup if access token provided
-      if (response.access) {
-        saveAuth({
-          access: response.access,
-          refresh: response.refresh,
-          role: response.role,
-          username: response.username,
-        });
-      }
-
-      return response;
-    } catch (error) {
-      lastError = error as Error;
-      continue;
-    }
+  // Auto-login after successful signup if access token provided
+  if (response.access) {
+    saveAuth({
+      access: response.access,
+      refresh: response.refresh,
+      role: response.role,
+      username: response.username,
+    });
   }
 
-  throw lastError || new Error("Unable to create account. Please try again.");
+  return response;
 }
 
 // ============================================================================
@@ -131,7 +126,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<RefreshT
       headers: getAuthHeaders(),
       body: JSON.stringify({ refresh: refreshToken }),
     },
-    false,
+    false
   );
 }
 
@@ -171,7 +166,7 @@ export async function verifyToken(token: string): Promise<TokenVerifyResponse> {
         headers: getAuthHeaders(),
         body: JSON.stringify({ token }),
       },
-      false,
+      false
     );
     return { valid: true };
   } catch (error) {
@@ -200,7 +195,7 @@ export async function getCurrentUser(): Promise<CurrentUser> {
   return fetchJson<CurrentUser>(
     "/auth/user/",
     { method: "GET" },
-    true, // Requires authentication
+    true // Requires authentication
   );
 }
 
@@ -224,7 +219,7 @@ export async function changePassword(payload: ChangePasswordRequest): Promise<an
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     },
-    true,
+    true
   );
 }
 
@@ -252,7 +247,7 @@ export async function requestPasswordReset(email: string): Promise<any> {
       headers: getAuthHeaders(),
       body: JSON.stringify({ email }),
     },
-    false,
+    false
   );
 }
 
@@ -261,7 +256,7 @@ export async function requestPasswordReset(email: string): Promise<any> {
  */
 export async function confirmPasswordReset(
   token: string,
-  newPassword: string,
+  newPassword: string
 ): Promise<any> {
   return fetchJson<any>(
     "/auth/password/reset/confirm/",
@@ -270,6 +265,6 @@ export async function confirmPasswordReset(
       headers: getAuthHeaders(),
       body: JSON.stringify({ token, new_password: newPassword }),
     },
-    false,
+    false
   );
 }
