@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Bell, ClipboardCheck, Filter, HeartPulse, Leaf, Menu, PawPrint, PhoneCall, ShieldAlert, Star, Wheat, X } from "lucide-react";
 import { clearAuth, fetchJson, getStoredAuth } from "@/lib/api";
 import { useRoleProtection } from "@/hooks/useRoleProtection";
@@ -36,6 +37,7 @@ const livestockCards = [
 ];
 
 export default function FarmerDashboardPage() {
+  const router = useRouter();
   const [notice, setNotice] = useState("");
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
@@ -138,7 +140,7 @@ export default function FarmerDashboardPage() {
             <p className="mt-3 text-sm text-text-secondary">Your farm is looking healthy today. <span className="font-semibold text-primary">{dashboard.appointments} upcoming appointments.</span></p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <button onClick={() => showNotice("Opening tele-health consultation...")} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3.5 text-xs font-bold text-white shadow-sm hover:bg-primary-light"><HeartPulse className="h-4 w-4" /> Start Tele-Health Consultation</button>
+            <button onClick={() => router.push("/farmer/consultation")} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3.5 text-xs font-bold text-white shadow-sm hover:bg-primary-light"><HeartPulse className="h-4 w-4" /> Start Tele-Health Consultation</button>
             <button onClick={() => showNotice("Emergency report started.")} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#FFF0F0] px-5 py-3.5 text-xs font-bold text-[#C34A4A] hover:bg-[#FFE3E3]"><ShieldAlert className="h-4 w-4" /> Report Emergency</button>
           </div>
         </section>

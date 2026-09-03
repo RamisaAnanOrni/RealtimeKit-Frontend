@@ -259,3 +259,103 @@ export async function getSpecializations(): Promise<string[]> {
     false, // Public endpoint
   );
 }
+
+// ============================================================================
+// VET CONSULTATION REQUESTS (NEW WORKFLOW)
+// ============================================================================
+
+export interface ConsultationRequest {
+  id: number;
+  farmer: {
+    id: number;
+    username: string;
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
+  };
+  animal_type: string;
+  breed?: string;
+  gender?: string;
+  age?: string;
+  health_problem: string;
+  status: string;
+  assigned_vet?: {
+    id: number;
+    user: {
+      username: string;
+      first_name?: string;
+    };
+  };
+  farmer_link?: string;
+  vet_link?: string;
+  link_expires_at?: string;
+  expires_at?: string;
+  is_link_expired?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VetResponseResult {
+  status: string;
+  message: string;
+  vet_link?: string;
+  consultation_id: number;
+}
+
+/**
+ * Get all consultation requests assigned to the logged-in Vet
+ */
+export async function getVetAssignedRequests(): Promise<ConsultationRequest[]> {
+  return fetchJson<ConsultationRequest[]>(
+    "/vet/request/list/",
+    { method: "GET" },
+    true,
+  );
+}
+
+/**
+ * Accept a consultation request
+ * Returns the vet_link for immediate video session access
+ */
+export async function acceptConsultationRequest(
+  requestId: number,
+): Promise<VetResponseResult> {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_BACKEND_URL}/vet/requests/${requestId}/respond/`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(false),
+      body: JSON.stringify({ action: "accept" }),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || `Failed to accept request: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Decline a consultation request
+ */
+export async function declineConsultationRequest(
+  requestId: number,
+): Promise<VetResponseResult> {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_BACKEND_URL}/vet/requests/${requestId}/respond/`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(false),
+      body: JSON.stringify({ action: "decline" }),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || `Failed to decline request: ${response.status}`);
+  }
+
+  return response.json();
+}

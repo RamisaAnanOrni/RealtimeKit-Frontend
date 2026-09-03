@@ -150,6 +150,113 @@ export async function deleteLivestock(livestockId: number): Promise<void> {
 }
 
 // ============================================================================
+// FARMER CONSULTATION REQUESTS
+// ============================================================================
+
+export interface ConsultationRequest {
+  id: number;
+  animal_type: string;
+  breed?: string;
+  gender?: string;
+  age?: string;
+  health_problem?: string;
+  cow_image?: string;
+  status: "PENDING" | "ASSIGNED" | "MEETING_CREATED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  assigned_vet?: {
+    id: number;
+    user: {
+      id: number;
+      username: string;
+      full_name?: string;
+    };
+    speciality?: string;
+  };
+  meeting_link?: string;
+  link_expires_at?: string;
+  is_link_expired?: boolean;
+  can_join?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ConsultationResponse {
+  id: number;
+  animal_type: string;
+  breed?: string;
+  gender?: string;
+  age?: string;
+  health_problem?: string;
+  status: string;
+  meeting_link?: string;
+  link_expires_at?: string;
+  is_link_expired?: boolean;
+  can_join?: boolean;
+  assigned_vet?: any;
+  created_at?: string;
+}
+
+/**
+ * Create a new tele-health consultation request
+ */
+export async function createConsultationRequest(data: {
+  animal_type: string;
+  breed?: string;
+  gender?: string;
+  age?: string;
+  health_problem: string;
+  cow_image?: File;
+}): Promise<ConsultationRequest> {
+  const formData = new FormData();
+  formData.append("animal_type", data.animal_type);
+  if (data.breed) formData.append("breed", data.breed);
+  if (data.gender) formData.append("gender", data.gender);
+  if (data.age) formData.append("age", data.age);
+  formData.append("health_problem", data.health_problem);
+  if (data.cow_image) formData.append("cow_image", data.cow_image);
+
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_BACKEND_URL}/farmer/consultation/create/`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(false), // Don't set Content-Type for FormData - let browser set multipart/form-data
+      body: formData,
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to create consultation: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Get consultation request status (for polling)
+ */
+export async function getConsultationStatus(
+  requestId: number,
+): Promise<ConsultationResponse> {
+  return fetchJson<ConsultationResponse>(
+    `/farmer/consultation/${requestId}/status/`,
+    { method: "GET" },
+    true,
+  );
+}
+
+/**
+ * Get list of farmer's consultation requests
+ */
+export async function getFarmerConsultations(): Promise<ConsultationRequest[]> {
+  return fetchJson<ConsultationRequest[]>(
+    "/farmer/request/list/",
+    { method: "GET" },
+    true,
+  );
+}
+
+// ============================================================================
 // FARMER REQUESTS & CONSULTATIONS
 // ============================================================================
 
