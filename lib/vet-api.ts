@@ -314,6 +314,53 @@ export async function getVetAssignedRequests(): Promise<ConsultationRequest[]> {
 }
 
 /**
+ * Get video meetings assigned to the logged-in Vet.
+ * Each meeting carries the vet_link, farmer_link, request, and farmer details.
+ */
+export async function getVetAssignedMeetings(): Promise<any[]> {
+  return fetchJson<any[]>(
+    "/vet/meetings/",
+    { method: "GET" },
+    true,
+  );
+}
+
+/**
+ * Get assigned consultation requests with fallback:
+ * 1. Try /vet/meetings/ (rich data with vet_link) when available.
+ * 2. Fall back to /vet/request/list/ (legacy endpoint).
+ */
+export async function getVetAssignedRequestsWithFallback(): Promise<ConsultationRequest[]> {
+  try {
+    const meetings = await getVetAssignedMeetings();
+    if (Array.isArray(meetings) && meetings.length > 0) {
+      return meetings.map((m: any) => ({
+        id: m.request?.id ?? m.id,
+        farmer: m.farmer ?? m.request?.farmer ?? { username: "Farmer" },
+        animal_type: m.request?.animal_type ?? m.livestock_type ?? "",
+        breed: m.request?.breed ?? "",
+        gender: m.request?.gender ?? "",
+        age: m.request?.age ?? "",
+        health_problem: m.request?.health_problem ?? m.request?.problem ?? "",
+        status: m.request?.status ?? m.status ?? "PENDING",
+        assigned_vet: m.vet ?? m.request?.assigned_vet,
+        vet_link: m.vet_link ?? m.request?.vet_link,
+        farmer_link: m.farmer_link ?? m.request?.farmer_link,
+        link_expires_at: m.request?.link_expires_at ?? m.request?.expires_at,
+        expires_at: m.request?.expires_at,
+        is_link_expired: m.request?.is_link_expired ?? false,
+        created_at: m.created_at ?? m.request?.created_at ?? new Date().toISOString(),
+        updated_at: m.updated_at ?? m.request?.updated_at ?? new Date().toISOString(),
+      }));
+    }
+  } catch {
+    // Meetings endpoint unavailable -> fall through to legacy endpoint.
+  }
+
+  return getVetAssignedRequests();
+}
+
+/**
  * Accept a consultation request
  * Returns the vet_link for immediate video session access
  */

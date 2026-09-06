@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createConsultationRequest } from "@/lib/farmer-api";
-import { getErrorMessage } from "@/lib/api";
+import { getErrorMessage, getStoredAuth, normalizeRole } from "@/lib/api";
 import { AlertCircle, Loader2 } from "lucide-react";
 
 interface ConsultationFormProps {
@@ -60,6 +60,24 @@ export default function ConsultationRequestForm({
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    // Auth / role guard: only a logged-in FARMER may submit. Prevents a VET
+    // (or leftover) token from being replayed against the farmer endpoint.
+    const auth = getStoredAuth();
+    if (!auth?.access) {
+      setError("Authentication required. Redirecting to sign in...");
+      setLoading(false);
+      router.push("/auth");
+      return;
+    }
+    if (normalizeRole(auth.role) !== "farmer") {
+      setError(
+        "Only farmer accounts can submit consultation requests. Redirecting to sign in...",
+      );
+      setLoading(false);
+      router.push("/auth");
+      return;
+    }
 
     // Validate required fields
     if (!formData.animal_type) {

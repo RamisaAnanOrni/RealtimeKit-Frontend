@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AuthProvider } from '@/components/AuthProvider';
 
 export const metadata: Metadata = {
   title: 'Agricore VetCare - Professional Veterinary Care',
@@ -24,7 +25,7 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-background text-on-surface antialiased font-sans">
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

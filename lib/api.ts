@@ -68,14 +68,18 @@ export function getStoredAuth(): AuthRecord | null {
   }
 }
 
+const AUTH_CHANGED_EVENT = "agrivet-auth-changed";
+
 export function saveAuth(auth: AuthRecord) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem("agrivet_auth", JSON.stringify(auth));
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }
 
 export function clearAuth() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem("agrivet_auth");
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }
 
 export function getAuthToken(): string | null {

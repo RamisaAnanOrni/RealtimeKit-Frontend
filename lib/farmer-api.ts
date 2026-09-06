@@ -4,7 +4,7 @@
  * Direct Django backend calls only - NO Next.js API routes.
  */
 
-import { fetchJson, getAuthHeaders } from "./api";
+import { fetchJson, getAuthHeaders, getAuthToken } from "./api";
 
 // ============================================================================
 // FARMER PROFILE
@@ -206,6 +206,15 @@ export async function createConsultationRequest(data: {
   health_problem: string;
   cow_image?: File;
 }): Promise<ConsultationRequest> {
+  // Explicitly require the FARMER's JWT so a VET token can never be replayed
+  // against the farmer request-creation endpoint (no token bleed).
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error(
+      "Authentication required. Please sign in with your farmer account.",
+    );
+  }
+
   const formData = new FormData();
   formData.append("animal_type", data.animal_type);
   if (data.breed) formData.append("breed", data.breed);
@@ -218,15 +227,23 @@ export async function createConsultationRequest(data: {
     `${process.env.NEXT_PUBLIC_BACKEND_URL}/farmer/consultation/create/`,
     {
       method: "POST",
-      headers: getAuthHeaders(false), // Don't set Content-Type for FormData - let browser set multipart/form-data
+      headers: {
+        ...getAuthHeaders(false), // Don't set Content-Type for FormData - let browser set multipart/form-data
+        Authorization: `Bearer ${token}`,
+      },
       body: formData,
     },
   );
 
   if (!response.ok) {
-    throw new Error(
-      `Failed to create consultation: ${response.status} ${response.statusText}`,
-    );
+    let message = `Failed to create consultation: ${response.status}`;
+    try {
+      const errorData = await response.json();
+      message = errorData?.detail ?? errorData?.message ?? message;
+    } catch {
+      // Non-JSON response body (e.g. an HTML error page) - keep the fallback.
+    }
+    throw new Error(message);
   }
 
   return response.json();

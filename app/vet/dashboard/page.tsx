@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -12,9 +12,10 @@ import {
   Send,
 } from "lucide-react";
 import VetRequestCard from "@/components/VetRequestCard";
+import { useAuth } from "@/components/AuthProvider";
 import { getStoredAuth } from "@/lib/api";
 import {
-  getVetAssignedRequests,
+  getVetAssignedRequestsWithFallback,
   acceptConsultationRequest,
   declineConsultationRequest,
   getVetDashboard,
@@ -31,6 +32,9 @@ const UPCOMING_APPOINTMENTS = [
   { id: 3, time: "12:00", farmer: "Fatima Begum", animal: "Goat", symptoms: "Hoof rot, limping" },
 ];
 
+// Stable expiry fallback (evaluated once at module load, not during a render).
+const DEFAULT_EXPIRY = new Date(Date.now() + 10 * 60000).toISOString();
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -38,7 +42,6 @@ export default function VetDashboardPage() {
   const router = useRouter();
 
   // Auth & profile
-  const [vetName, setVetName] = useState("Veterinarian");
   const [isActive, setIsActive] = useState(true);
 
   // Data
@@ -58,33 +61,69 @@ export default function VetDashboardPage() {
   // -----------------------------------------------------------------------
   // Auth check + data fetch
   // -----------------------------------------------------------------------
+  const { user, authLoading } = useAuth();
+  const vetName = user?.username || "Veterinarian";
+
+  const load = useCallback(
+    async (silent = false) => {
+      try {
+        const [reqs, dash] = await Promise.all([
+          getVetAssignedRequestsWithFallback(),
+          getVetDashboard().catch(() => null),
+        ]);
+        setRequests(reqs);
+        if (dash) setStats(dash);
+        setError(null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to load dashboard";
+        if (/403|permission/i.test(msg)) {
+          // Backend rejected the request as a non-VET. Force a relogin.
+          setError("You do not have veterinarian access. Redirecting to sign in...");
+          setTimeout(() => router.replace("/auth"), 1500);
+        } else if (/401|unauthorized|invalid/i.test(msg)) {
+          setError("Your session has expired. Redirecting to sign in...");
+          setTimeout(() => router.replace("/auth"), 1500);
+        } else {
+          setError(msg);
+        }
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [router],
+  );
+
+  // Gate: never redirect while the stored session/role is still resolving.
   useEffect(() => {
+    if (authLoading) return;
+
     const auth = getStoredAuth();
     if (!auth?.access) {
       router.push("/auth");
       return;
     }
-    if (auth.username) setVetName(auth.username);
 
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const [reqs, dash] = await Promise.all([
-          getVetAssignedRequests(),
-          getVetDashboard().catch(() => null),
-        ]);
-        setRequests(reqs);
-        if (dash) setStats(dash);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load dashboard");
-      } finally {
-        setLoading(false);
-      }
-    };
+    // Role guard: only VET accounts may access the vet dashboard.
+    // Non-vets (farmers/admin/unknown) must NOT hit VET-only endpoints,
+    // otherwise Django returns 403 Forbidden.
+    if (user?.role !== "vet") {
+      // Farmers (and admins) go to the farmer experience; unauthenticated -> auth.
+      router.replace("/farmer/dashboard");
+      return;
+    }
 
-    load();
-  }, [router]);
+    // Defer the initial fetch out of the effect's synchronous phase; every
+    // setState inside `load` runs only after its awaited fetches settle.
+    void Promise.resolve().then(() => load());
+  }, [authLoading, user, router, load]);
+
+  // Poll quietly every 3s so a meeting link/status change pushed from the
+  // Django admin is picked up without a manual page refresh.
+  useEffect(() => {
+    if (authLoading || user?.role !== "vet") return;
+    const timer = setInterval(() => load(true), 10000);
+    return () => clearInterval(timer);
+  }, [authLoading, user, load]);
 
   // -----------------------------------------------------------------------
   // Handlers
@@ -301,8 +340,10 @@ export default function VetDashboardPage() {
                       expiresAt={
                         request.expires_at ||
                         request.link_expires_at ||
-                        new Date(Date.now() + 10 * 60000).toISOString()
+                        DEFAULT_EXPIRY
                       }
+                      status={request.status}
+                      vetLink={request.vet_link}
                       onAccept={handleAccept}
                       onDecline={handleDecline}
                     />

@@ -11,6 +11,8 @@ interface VetRequestCardProps {
   location?: string;
   createdAt: string;
   expiresAt: string;
+  status?: string;
+  vetLink?: string;
   onAccept: (requestId: number) => Promise<void>;
   onDecline: (requestId: number) => Promise<void>;
 }
@@ -23,6 +25,8 @@ export default function VetRequestCard({
   location,
   createdAt,
   expiresAt,
+  status,
+  vetLink,
   onAccept,
   onDecline,
 }: VetRequestCardProps) {
@@ -81,6 +85,12 @@ export default function VetRequestCard({
     }
   };
 
+  const handleJoin = () => {
+    if (vetLink) {
+      window.open(vetLink, "_blank", "width=1200,height=800");
+    }
+  };
+
   // If expired, show a different UI
   if (isExpired) {
     return (
@@ -100,7 +110,14 @@ export default function VetRequestCard({
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-lg font-bold text-foreground">Farmer Request</h3>
-          <p className="text-sm text-text-muted">Request #{requestId}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-text-muted">Request #{requestId}</p>
+            {status && (
+              <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+                {status.replace(/_/g, " ")}
+              </span>
+            )}
+          </div>
         </div>
         
         {/* Countdown badge */}
@@ -165,15 +182,15 @@ export default function VetRequestCard({
         </button>
 
         <button
-          onClick={handleAccept}
+          onClick={vetLink ? handleJoin : handleAccept}
           disabled={isAccepting || isDeclining}
-          className="flex-1 px-4 py-2.5 rounded-lg font-medium text-sm
+          className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm
                      bg-gradient-to-r from-green-600 to-emerald-600
                      hover:from-green-700 hover:to-emerald-700
                      text-white shadow-sm hover:shadow-md
                      transition-all duration-200
                      disabled:opacity-50 disabled:cursor-not-allowed
-                     active:scale-98"
+                     active:scale-98 ${vetLink ? "ring-2 ring-emerald-300 animate-pulse" : ""}`}
         >
           {isAccepting ? (
             <>
@@ -181,7 +198,10 @@ export default function VetRequestCard({
               Joining...
             </>
           ) : (
-            "Join Video Call"
+            <>
+              {vetLink && <span className="inline-block h-2 w-2 rounded-full bg-white mr-2" />}
+              Join Video Call
+            </>
           )}
         </button>
       </div>
