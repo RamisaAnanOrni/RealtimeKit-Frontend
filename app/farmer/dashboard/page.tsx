@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, ClipboardCheck, Filter, HeartPulse, Leaf, Menu, PawPrint, PhoneCall, ShieldAlert, Star, Wheat, X } from "lucide-react";
-import { clearAuth, fetchJson, getStoredAuth } from "@/lib/api";
+import { fetchJson, getStoredAuth } from "@/lib/api";
 import { useRoleProtection } from "@/hooks/useRoleProtection";
+import { useAuth } from "@/components/AuthProvider";
 
 type DashboardLog = {
   id: string;
@@ -38,6 +39,7 @@ const livestockCards = [
 
 export default function FarmerDashboardPage() {
   const router = useRouter();
+  const { logout: authLogout } = useAuth();
   const [notice, setNotice] = useState("");
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
@@ -81,7 +83,7 @@ export default function FarmerDashboardPage() {
   }, []);
 
   async function logout() {
-    clearAuth();
+    await authLogout();
     window.location.assign("/auth");
   }
 

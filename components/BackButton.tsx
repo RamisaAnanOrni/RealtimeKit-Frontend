@@ -12,7 +12,9 @@ interface BackButtonProps {
 }
 
 /**
- * Reusable back navigation button for sub-views and forms
+ * Reusable back navigation button for sub-views and forms.
+ * Defaults to `router.back()`; falls back to `href` (or the root page) when
+ * there is no browser history to go back to.
  */
 export default function BackButton({
   href,
@@ -25,10 +27,14 @@ export default function BackButton({
   const handleClick = () => {
     if (onClick) {
       onClick();
-    } else if (href) {
-      router.push(href);
-    } else {
+      return;
+    }
+    if (typeof window !== "undefined" && window.history.length > 1) {
       router.back();
+    } else if (href) {
+      router.replace(href);
+    } else {
+      router.push("/");
     }
   };
 

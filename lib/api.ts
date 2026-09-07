@@ -413,3 +413,30 @@ export function getErrorMessage(error: unknown): string {
   }
   return "An unexpected error occurred";
 }
+
+// ============================================================================
+// MEETING ROOM LINK UTILITY
+// ============================================================================
+
+/**
+ * Tag a Dyte/RealtimeKit join URL with the consultation id + participant role
+ * so the embedded meeting page (`/vet`, `/farmer?token=...`) knows which
+ * consultation to mark COMPLETED when the participant presses "Leave".
+ * The raw stored links look like `<frontend>/farmer?token=<dyte-token>`; we
+ * simply add `rid` and `role` before `window.open(...)`.
+ */
+export function meetingLinkWithContext(
+  link: string,
+  requestId: number,
+  participant: "farmer" | "vet",
+): string {
+  try {
+    const url = new URL(link);
+    url.searchParams.set("rid", String(requestId));
+    url.searchParams.set("role", participant);
+    return url.toString();
+  } catch {
+    // Malformed link (e.g. a bare token) — return it untouched.
+    return link;
+  }
+}

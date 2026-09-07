@@ -6,11 +6,16 @@ import { useSearchParams } from "next/navigation";
 import { useDyteClient } from "@dytesdk/react-web-core";
 import { ArrowRight, Beef, Bell, CalendarDays, ChevronRight, CircleUserRound, ClipboardCheck, Filter, HeartPulse, Leaf, Menu, PawPrint, PhoneCall, ShieldAlert, Star, Wheat, X } from "lucide-react";
 import { getFarmerDashboard, logout } from "@/lib/api";
+import { completeConsultation } from "@/lib/farmer-api";
+import { useMeetingLeaveSync } from "@/hooks/useMeetingLeaveSync";
 
 const DyteMeeting = dynamic(() => import("@dytesdk/react-ui-kit").then((mod) => mod.DyteMeeting), { ssr: false });
 
 function FarmerMeeting() {
-  const token = useSearchParams().get("token");
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
+  const ridParam = searchParams.get("rid");
+  const roleParam = searchParams.get("role");
   const [meeting, initMeeting] = useDyteClient();
   const [loading, setLoading] = useState(true);
 
@@ -23,6 +28,22 @@ function FarmerMeeting() {
     }
     joinMeeting();
   }, [token, initMeeting]);
+
+  // When the farmer presses the built-in "Leave" control in the call UI,
+  // notify Django immediately (request -> COMPLETED, Meeting -> ENDED), then
+  // return to the farmer dashboard. `rid`/`role` are appended to the join URL
+  // by meetingLinkWithContext when the consultation lobby opens the room.
+  useMeetingLeaveSync(meeting, async () => {
+    if (ridParam && roleParam === "farmer") {
+      try {
+        await completeConsultation(Number(ridParam));
+      } catch (err) {
+        console.error("Failed to notify backend after leaving the call:", err);
+      }
+    }
+    const destination = roleParam === "vet" ? "/vet/dashboard" : "/farmer/dashboard";
+    window.location.assign(destination);
+  });
 
   if (loading || !meeting) return <div className="flex h-screen items-center justify-center text-xl font-bold text-primary">Joining Farmer...</div>;
   return <div className="h-screen"><DyteMeeting meeting={meeting} /></div>;

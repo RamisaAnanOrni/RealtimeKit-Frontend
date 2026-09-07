@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ConsultationStatusPage from "@/components/ConsultationStatusPage";
+import BackButton from "@/components/BackButton";
 import { getStoredAuth } from "@/lib/api";
 
 export default function ConsultationStatusRoute() {
@@ -36,6 +37,9 @@ export default function ConsultationStatusRoute() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-background-light py-12 px-4">
+      <div className="w-full max-w-2xl mx-auto mb-6">
+        <BackButton href="/farmer/consultation" label="Back to Consultation" />
+      </div>
       <ConsultationStatusPage consultationId={consultationId} />
     </div>
   );

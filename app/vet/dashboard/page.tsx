@@ -10,17 +10,21 @@ import {
   CheckCircle2,
   Award,
   Send,
+  LogOut,
 } from "lucide-react";
 import VetRequestCard from "@/components/VetRequestCard";
 import { useAuth } from "@/components/AuthProvider";
-import { getStoredAuth } from "@/lib/api";
+import { getStoredAuth, meetingLinkWithContext } from "@/lib/api";
 import {
   getVetAssignedRequestsWithFallback,
   acceptConsultationRequest,
   declineConsultationRequest,
+  completeConsultationRequest,
   getVetDashboard,
   ConsultationRequest,
   VetDashboardStats,
+  ApiRequestError,
+  ACTIVE_CONSULTATION_STATUSES,
 } from "@/lib/vet-api";
 
 // ---------------------------------------------------------------------------
@@ -49,6 +53,7 @@ export default function VetDashboardPage() {
   const [stats, setStats] = useState<VetDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<number | null>(null);
 
   // Rx Pad form
@@ -61,7 +66,7 @@ export default function VetDashboardPage() {
   // -----------------------------------------------------------------------
   // Auth check + data fetch
   // -----------------------------------------------------------------------
-  const { user, authLoading } = useAuth();
+  const { user, authLoading, logout } = useAuth();
   const vetName = user?.username || "Veterinarian";
 
   const load = useCallback(
@@ -71,7 +76,8 @@ export default function VetDashboardPage() {
           getVetAssignedRequestsWithFallback(),
           getVetDashboard().catch(() => null),
         ]);
-        setRequests(reqs);
+        const sorted = [...reqs].sort((a, b) => b.id - a.id);
+        setRequests(sorted);
         if (dash) setStats(dash);
         setError(null);
       } catch (err) {
@@ -125,21 +131,52 @@ export default function VetDashboardPage() {
     return () => clearInterval(timer);
   }, [authLoading, user, load]);
 
+  // Auto-dismiss the "not available" toast.
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 4500);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
   // -----------------------------------------------------------------------
   // Handlers
   // -----------------------------------------------------------------------
+  const handleRespondError = (err: unknown, requestId: number) => {
+    if (
+      err instanceof ApiRequestError &&
+      (err.status === 404 || err.status === 415)
+    ) {
+      // The request row was deleted/expired (or its payload became unreadable)
+      // server-side; drop the card so it never lingers, surface a friendly
+      // notification, and pull fresh state immediately.
+      setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      setNotice("This request is no longer available.");
+      void load(true);
+      return;
+    }
+    setError(err instanceof Error ? err.message : "Failed to respond to request");
+  };
   const handleAccept = async (requestId: number) => {
     setProcessingId(requestId);
     try {
       const result = await acceptConsultationRequest(requestId);
+      // Keep the card visible in its accepted state; the vet_link returned by
+      // the backend (from the generated Meeting) instantly enables Join.
       setRequests((prev) =>
         prev.map((r) =>
-          r.id === requestId ? { ...r, status: "ACCEPTED", vet_link: result.vet_link } : r,
+          r.id === requestId
+            ? { ...r, status: "ACCEPTED", vet_link: result.vet_link ?? r.vet_link ?? "" }
+            : r,
         ),
       );
-      if (result.vet_link) window.open(result.vet_link, "_blank", "width=1200,height=800");
+      if (result.vet_link)
+        window.open(
+          meetingLinkWithContext(result.vet_link, requestId, "vet"),
+          "_blank",
+          "width=1200,height=800",
+        );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to accept");
+      handleRespondError(err, requestId);
     } finally {
       setProcessingId(null);
     }
@@ -153,10 +190,33 @@ export default function VetDashboardPage() {
         prev.map((r) => (r.id === requestId ? { ...r, status: "DECLINED" } : r)),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to decline");
+      handleRespondError(err, requestId);
     } finally {
       setProcessingId(null);
     }
+  };
+
+  const handleComplete = async (requestId: number) => {
+    setProcessingId(requestId);
+    try {
+      // Backend transitions FarmerRequest.status -> COMPLETED and
+      // Meeting.status -> ENDED, then frees the vet up (AVAILABLE).
+      await completeConsultationRequest(requestId);
+      // Remove the card from "Incoming Farmer Requests" immediately ...
+      setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      setNotice("Consultation completed & vet released.");
+      // ... and pull fresh dashboard data so the stats/hero stay accurate.
+      void load(true);
+    } catch (err) {
+      handleRespondError(err, requestId);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/auth");
   };
 
   const handleSubmitRx = async () => {
@@ -172,8 +232,8 @@ export default function VetDashboardPage() {
   // -----------------------------------------------------------------------
   // Derived values
   // -----------------------------------------------------------------------
-  const activeRequests = requests.filter(
-    (r) => r.status !== "DECLINED" && r.status !== "COMPLETED",
+  const activeRequests = requests.filter((r) =>
+    ACTIVE_CONSULTATION_STATUSES.has(r.status),
   );
 
   const pendingCount = stats?.pending_requests ?? activeRequests.length;
@@ -211,13 +271,21 @@ export default function VetDashboardPage() {
               </span>
             </div>
 
-            {/* Avatar */}
+            {/* Avatar + Logout */}
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center">
                 <span className="text-sm font-bold text-on-primary">
                   {vetName.charAt(0).toUpperCase()}
                 </span>
               </div>
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-text-muted hover:text-foreground hover:bg-secondary/50 transition-colors"
+                title="Logout"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
             </div>
           </div>
         </div>
@@ -246,6 +314,16 @@ export default function VetDashboardPage() {
               <p className="font-medium">Error</p>
               <p className="text-sm mt-1">{error}</p>
             </div>
+          </div>
+        )}
+
+        {/* ================================================================
+            TOAST NOTIFICATION
+        ================================================================ */}
+        {notice && (
+          <div className="fixed bottom-6 right-6 z-50 rounded-lg bg-emerald-950 text-white px-5 py-3 text-sm font-medium shadow-lg flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            {notice}
           </div>
         )}
 
@@ -326,27 +404,36 @@ export default function VetDashboardPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {activeRequests.map((request) => (
-                    <VetRequestCard
-                      key={request.id}
-                      requestId={request.id}
-                      farmerName={
-                        request.farmer.first_name || request.farmer.username || "Farmer"
-                      }
-                      animalType={request.animal_type}
-                      breed={request.breed}
-                      location="Gazipur, Bangladesh"
-                      createdAt={request.created_at}
-                      expiresAt={
-                        request.expires_at ||
-                        request.link_expires_at ||
-                        DEFAULT_EXPIRY
-                      }
-                      status={request.status}
-                      vetLink={request.vet_link}
-                      onAccept={handleAccept}
-                      onDecline={handleDecline}
-                    />
+                  {activeRequests.map((request, index) => (
+                    <div key={request.id}>
+                      {index === 0 && (
+                        <div className="mb-2 flex items-center gap-2">
+                          <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary">
+                            Newest Request
+                          </span>
+                        </div>
+                      )}
+                      <VetRequestCard
+                        requestId={request.id}
+                        farmerName={
+                          request.farmer.first_name || request.farmer.username || "Farmer"
+                        }
+                        animalType={request.animal_type}
+                        breed={request.breed}
+                        location="Gazipur, Bangladesh"
+                        createdAt={request.created_at}
+                        expiresAt={
+                          request.expires_at ||
+                          request.link_expires_at ||
+                          DEFAULT_EXPIRY
+                        }
+                        status={request.status}
+                        vetLink={request.vet_join_link ?? request.vet_link ?? ""}
+                        onAccept={handleAccept}
+                        onDecline={handleDecline}
+                        onComplete={handleComplete}
+                      />
+                    </div>
                   ))}
                 </div>
               )}

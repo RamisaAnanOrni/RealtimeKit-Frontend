@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
-import { getStoredAuth, clearAuth } from "@/lib/api";
+import { useAuth } from "@/components/AuthProvider";
 
 interface VetHeaderProps {
   vetName?: string;
@@ -12,32 +12,35 @@ interface VetHeaderProps {
 
 export default function VetHeader({ vetName = "Dr. Veterinarian", onLogout }: VetHeaderProps) {
   const router = useRouter();
+  const { logout: globalLogout } = useAuth();
   const [currentDate, setCurrentDate] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
-    // Format current date
-    const now = new Date();
-    const options: Intl.DateTimeFormatOptions = {
-      weekday: "long",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    };
-    setCurrentDate(now.toLocaleDateString("en-US", options));
+    // Defer to avoid cascading re-renders within the effect body.
+    void Promise.resolve().then(() => {
+      const now = new Date();
+      const options: Intl.DateTimeFormatOptions = {
+        weekday: "long",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      };
+      setCurrentDate(now.toLocaleDateString("en-US", options));
+    });
   }, []);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      // Clear authentication
-      clearAuth();
-      
+      // Global logout clears tokens, cookies and resets auth state
+      await globalLogout();
+
       // Call optional callback
       if (onLogout) {
         onLogout();
       }
-      
+
       // Redirect to login
       router.push("/auth");
     } catch (error) {

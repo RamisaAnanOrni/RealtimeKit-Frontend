@@ -14,6 +14,8 @@ import {
   getStoredAuth,
   normalizeRole,
   saveAuth,
+  clearAuth,
+  buildUrl,
 } from "@/lib/api";
 
 type AuthUser = {
@@ -24,11 +26,13 @@ type AuthUser = {
 type AuthContextValue = {
   user: AuthUser | null;
   authLoading: boolean;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   authLoading: true,
+  logout: async () => {},
 });
 
 /**
@@ -75,6 +79,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const logout = useCallback(async () => {
+    const stored = getStoredAuth();
+    if (stored?.refresh) {
+      try {
+        await fetch(buildUrl("/auth/logout/"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh: stored.refresh }),
+        });
+      } catch {
+        // Server logout is best-effort; local cleanup always proceeds.
+      }
+    }
+
+    clearAuth();
+    try {
+      document.cookie = "accessToken=; Max-Age=0; path=/";
+      document.cookie = "refreshToken=; Max-Age=0; path=/";
+      document.cookie = "access_token=; Max-Age=0; path=/";
+      document.cookie = "refresh_token=; Max-Age=0; path=/";
+      document.cookie = "agrivet_auth=; Max-Age=0; path=/";
+    } catch {
+      // Cookie cleanup is best-effort.
+    }
+
+    setUser(null);
+    setAuthLoading(false);
+  }, []);
+
   useEffect(() => {
     // Initial resolution after a page load / refresh. Guards block on
     // `authLoading`, so no premature role-based redirects can happen here.
@@ -93,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [resolveAuth]);
 
   return (
-    <AuthContext.Provider value={{ user, authLoading }}>
+    <AuthContext.Provider value={{ user, authLoading, logout }}>
       {children}
     </AuthContext.Provider>
   );

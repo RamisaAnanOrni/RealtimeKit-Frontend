@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConsultationPolling } from "@/hooks/useConsultationPolling";
-import { ConsultationResponse } from "@/lib/farmer-api";
+import { completeConsultation, markConsultationJoined } from "@/lib/farmer-api";
+import { meetingLinkWithContext } from "@/lib/api";
 import {
   Clock,
   Video,
@@ -24,6 +25,8 @@ export default function ConsultationStatusPage({
 }: ConsultationStatusProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
+  const [isEnding, setIsEnding] = useState(false);
+  const [endError, setEndError] = useState<string | null>(null);
 
   // Use the polling hook for real-time updates
   const { data, error, isPolling, retry } = useConsultationPolling(
@@ -37,15 +40,47 @@ export default function ConsultationStatusPage({
   const consultation = data;
   const isWaiting =
     consultation && consultation.status === "PENDING";
-  const isReady = consultation && consultation.can_join;
+  const isDeclined = consultation && consultation.status === "DECLINED";
+  const isCompleted =
+    consultation &&
+    ["COMPLETED", "EXPIRED", "DECLINED", "CANCELLED"].includes(
+      consultation.status
+    );
+  const isReady =
+    consultation &&
+    consultation.can_join &&
+    // Join button visible exactly at: MEETING_CREATED (admin generated the
+    // link), ACCEPTED / IN_PROGRESS (rejoin / vet-joined first). Hidden at
+    // every other state — including terminal COMPLETED / DECLINED / CANCELLED.
+    ["MEETING_CREATED", "ACCEPTED", "IN_PROGRESS"].includes(
+      consultation.status
+    );
   const isExpired = consultation && consultation.is_link_expired;
 
-  // Handle joining the call
-  const handleJoinCall = () => {
-    if (consultation?.meeting_link) {
-      // Open the meeting link in a new window
-      window.open(consultation.meeting_link, "_blank");
+  // Handle joining the call: first signal the backend (status -> ACCEPTED,
+  // Meeting -> STARTED), then open the room with the consultation id + role
+  // attached so the meeting page can complete the consultation on "Leave".
+  // The backend update is best-effort so a transient network error never
+  // blocks the Farmer from joining; the join button stays visible in
+  // ACCEPTED / IN_PROGRESS anyway.
+  const handleJoinCall = async () => {
+    if (!consultation?.meeting_link) return;
+
+    try {
+      await markConsultationJoined(consultation.id);
+      retry();
+    } catch {
+      // Non-fatal — the link remains available in every active state.
     }
+
+    window.open(
+      meetingLinkWithContext(
+        consultation.meeting_link,
+        consultation.id,
+        "farmer",
+      ),
+      "_blank",
+    );
   };
 
   // Handle copying the link to clipboard
@@ -54,6 +89,23 @@ export default function ConsultationStatusPage({
       navigator.clipboard.writeText(consultation.meeting_link);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  // End the call from the farmer side: transition the request (and its
+  // Meeting) to COMPLETED, then refetch so the UI resolves to the completed
+  // banner instead of the join screen.
+  const handleEndCall = async () => {
+    if (!consultation || isEnding) return;
+    setIsEnding(true);
+    setEndError(null);
+    try {
+      await completeConsultation(consultation.id);
+      retry();
+    } catch (err) {
+      setEndError(err instanceof Error ? err.message : "Failed to end the consultation");
+    } finally {
+      setIsEnding(false);
     }
   };
 
@@ -155,6 +207,27 @@ export default function ConsultationStatusPage({
             JOIN VIDEO CALL
           </button>
 
+          <button
+            onClick={handleEndCall}
+            disabled={isEnding}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/30 py-3 text-sm font-semibold text-emerald-800 dark:text-emerald-200 transition hover:bg-emerald-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isEnding ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Ending call...
+              </>
+            ) : (
+              "End Call"
+            )}
+          </button>
+
+          {endError && (
+            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-800 dark:text-red-200">
+              {endError}
+            </p>
+          )}
+
           <div className="pt-2 border-t border-emerald-500/20">
             <p className="text-xs font-medium text-emerald-800/80 dark:text-emerald-300/80 mb-2">
               Or copy this link:
@@ -175,7 +248,11 @@ export default function ConsultationStatusPage({
                 )}
               </button>
               <a
-                href={consultation.meeting_link}
+                href={meetingLinkWithContext(
+                  consultation.meeting_link ?? "",
+                  consultation.id,
+                  "farmer",
+                )}
                 target="_blank"
                 rel="noopener noreferrer"
                 title="Open in new window"
@@ -189,7 +266,7 @@ export default function ConsultationStatusPage({
       )}
 
       {/* Expired Banner */}
-      {isExpired && (
+      {isExpired && !isCompleted && (
         <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-5 text-red-900 dark:text-red-200">
           <div className="flex items-start gap-3">
             <AlertCircle className="mt-0.5 h-6 w-6 shrink-0 text-red-600 dark:text-red-400" />
@@ -197,6 +274,27 @@ export default function ConsultationStatusPage({
               <h3 className="text-lg font-semibold">Meeting Link Expired</h3>
               <p className="mt-1 text-sm text-red-800/80 dark:text-red-300/80 leading-relaxed">
                 The meeting link has expired. Please contact support or submit a new consultation request.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Completed / Ended Banner */}
+      {isCompleted && (
+        <div className="rounded-2xl border border-gray-300/40 bg-gray-100/60 p-5 text-gray-700 dark:border-gray-700 dark:bg-gray-800/40 dark:text-gray-200">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-gray-500 dark:text-gray-400" />
+            <div>
+              <h3 className="text-lg font-semibold">
+                {isDeclined
+                  ? "Consultation Declined"
+                  : "Consultation Completed"}
+              </h3>
+              <p className="mt-1 text-sm leading-relaxed">
+                {isDeclined
+                  ? "The veterinarian could not take this consultation. Please submit a new request."
+                  : "This consultation has ended. The video call is no longer available."}
               </p>
             </div>
           </div>

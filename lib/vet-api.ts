@@ -6,6 +6,20 @@
 
 import { fetchJson, getAuthHeaders } from "./api";
 
+/**
+ * API error carrying the HTTP status code so callers can branch on specific
+ * outcomes (e.g. a 404 meaning the request row no longer exists).
+ */
+export class ApiRequestError extends Error {
+  status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+  }
+}
+
 // ============================================================================
 // VET PROFILE
 // ============================================================================
@@ -288,6 +302,7 @@ export interface ConsultationRequest {
   };
   farmer_link?: string;
   vet_link?: string;
+  vet_join_link?: string;
   link_expires_at?: string;
   expires_at?: string;
   is_link_expired?: boolean;
@@ -303,14 +318,44 @@ export interface VetResponseResult {
 }
 
 /**
+ * Statuses that count as "active / incoming". A request only reaches the Vet
+ * Dashboard once an Admin has generated a Meeting for it (MEETING_CREATED /
+ * ASSIGNED); ACCEPTED / IN_PROGRESS stay visible so an accepted call keeps
+ * its "Join Video Call" button until ended. PENDING/CREATED portal
+ * submissions (no meeting yet) and terminal rows are never shown.
+ */
+export const ACTIVE_CONSULTATION_STATUSES = new Set([
+  "MEETING_CREATED",
+  "ASSIGNED",
+  "ACCEPTED",
+  "IN_PROGRESS",
+]);
+
+/**
+ * Normalize list responses: accept a bare array OR common nested/paginated
+ * container shapes ({ results: [...], { requests: [...] }, { items: [...] }).
+ */
+export function extractList<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload as T[];
+  if (payload && typeof payload === "object") {
+    const obj = payload as Record<string, unknown>;
+    if (Array.isArray(obj.results)) return obj.results as T[];
+    if (Array.isArray(obj.requests)) return obj.requests as T[];
+    if (Array.isArray(obj.items)) return obj.items as T[];
+  }
+  return [];
+}
+
+/**
  * Get all consultation requests assigned to the logged-in Vet
  */
 export async function getVetAssignedRequests(): Promise<ConsultationRequest[]> {
-  return fetchJson<ConsultationRequest[]>(
+  const payload = await fetchJson<unknown>(
     "/vet/request/list/",
     { method: "GET" },
     true,
   );
+  return extractList<ConsultationRequest>(payload);
 }
 
 /**
@@ -318,40 +363,49 @@ export async function getVetAssignedRequests(): Promise<ConsultationRequest[]> {
  * Each meeting carries the vet_link, farmer_link, request, and farmer details.
  */
 export async function getVetAssignedMeetings(): Promise<any[]> {
-  return fetchJson<any[]>(
+  const payload = await fetchJson<unknown>(
     "/vet/meetings/",
     { method: "GET" },
     true,
   );
+  return extractList<Record<string, unknown>>(payload);
 }
 
 /**
  * Get assigned consultation requests with fallback:
  * 1. Try /vet/meetings/ (rich data with vet_link) when available.
  * 2. Fall back to /vet/request/list/ (legacy endpoint).
+ *
+ * Both feeds are filtered to ACTIVE statuses so completed/declined/stale
+ * consultations never appear as "incoming" request cards.
  */
 export async function getVetAssignedRequestsWithFallback(): Promise<ConsultationRequest[]> {
   try {
     const meetings = await getVetAssignedMeetings();
     if (Array.isArray(meetings) && meetings.length > 0) {
-      return meetings.map((m: any) => ({
-        id: m.request?.id ?? m.id,
-        farmer: m.farmer ?? m.request?.farmer ?? { username: "Farmer" },
-        animal_type: m.request?.animal_type ?? m.livestock_type ?? "",
-        breed: m.request?.breed ?? "",
-        gender: m.request?.gender ?? "",
-        age: m.request?.age ?? "",
-        health_problem: m.request?.health_problem ?? m.request?.problem ?? "",
-        status: m.request?.status ?? m.status ?? "PENDING",
-        assigned_vet: m.vet ?? m.request?.assigned_vet,
-        vet_link: m.vet_link ?? m.request?.vet_link,
-        farmer_link: m.farmer_link ?? m.request?.farmer_link,
-        link_expires_at: m.request?.link_expires_at ?? m.request?.expires_at,
-        expires_at: m.request?.expires_at,
-        is_link_expired: m.request?.is_link_expired ?? false,
-        created_at: m.created_at ?? m.request?.created_at ?? new Date().toISOString(),
-        updated_at: m.updated_at ?? m.request?.updated_at ?? new Date().toISOString(),
-      }));
+      const active = meetings
+        .map((m: any) => ({
+          id: m.request?.id ?? m.id,
+          farmer: m.farmer ?? m.request?.farmer ?? { username: "Farmer" },
+          animal_type: m.request?.animal_type ?? m.livestock_type ?? "",
+          breed: m.request?.breed ?? "",
+          gender: m.request?.gender ?? "",
+          age: m.request?.age ?? "",
+          health_problem: m.request?.health_problem ?? m.request?.problem ?? "",
+          status: m.request?.status ?? m.status ?? "PENDING",
+          assigned_vet: m.vet ?? m.request?.assigned_vet,
+          vet_link: m.vet_link ?? m.request?.vet_link,
+          farmer_link: m.farmer_link ?? m.request?.farmer_link,
+          link_expires_at: m.request?.link_expires_at ?? m.request?.expires_at,
+          expires_at: m.request?.expires_at,
+          is_link_expired: m.request?.is_link_expired ?? false,
+          created_at: m.created_at ?? m.request?.created_at ?? new Date().toISOString(),
+          updated_at: m.updated_at ?? m.request?.updated_at ?? new Date().toISOString(),
+        }))
+        .filter((r: ConsultationRequest) => ACTIVE_CONSULTATION_STATUSES.has(r.status));
+
+      // Only use the meetings feed if it actually produced active cards.
+      if (active.length > 0) return active;
     }
   } catch {
     // Meetings endpoint unavailable -> fall through to legacy endpoint.
@@ -371,14 +425,20 @@ export async function acceptConsultationRequest(
     `${process.env.NEXT_PUBLIC_BACKEND_URL}/vet/requests/${requestId}/respond/`,
     {
       method: "POST",
-      headers: getAuthHeaders(false),
+      // Explicit Content-Type: application/json (getAuthHeaders(true)) so DRF
+      // parses the body as JSON. Without it the browser would send
+      // "text/plain;charset=UTF-8", which Django returns as 415.
+      headers: getAuthHeaders(true),
       body: JSON.stringify({ action: "accept" }),
     },
   );
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || `Failed to accept request: ${response.status}`);
+    const errorData = await response.json().catch(() => null);
+    throw new ApiRequestError(
+      errorData?.detail || `Failed to accept request: ${response.status}`,
+      response.status,
+    );
   }
 
   return response.json();
@@ -394,14 +454,44 @@ export async function declineConsultationRequest(
     `${process.env.NEXT_PUBLIC_BACKEND_URL}/vet/requests/${requestId}/respond/`,
     {
       method: "POST",
-      headers: getAuthHeaders(false),
+      // Same as accept: explicit JSON content-type + auth headers.
+      headers: getAuthHeaders(true),
       body: JSON.stringify({ action: "decline" }),
     },
   );
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || `Failed to decline request: ${response.status}`);
+    const errorData = await response.json().catch(() => null);
+    throw new ApiRequestError(
+      errorData?.detail || `Failed to decline request: ${response.status}`,
+      response.status,
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Complete / end a consultation request after the video call finishes.
+ * Backend transitions the FarmerRequest to COMPLETED and its Meeting to ENDED.
+ */
+export async function completeConsultationRequest(
+  requestId: number,
+): Promise<VetResponseResult> {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_BACKEND_URL}/vet/requests/${requestId}/complete/`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(false),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new ApiRequestError(
+      errorData?.detail || `Failed to complete request: ${response.status}`,
+      response.status,
+    );
   }
 
   return response.json();

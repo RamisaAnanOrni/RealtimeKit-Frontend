@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { AlertCircle, Clock, MapPin, Loader2 } from "lucide-react";
+import { meetingLinkWithContext } from "@/lib/api";
 
 interface VetRequestCardProps {
   requestId: number;
@@ -15,6 +16,7 @@ interface VetRequestCardProps {
   vetLink?: string;
   onAccept: (requestId: number) => Promise<void>;
   onDecline: (requestId: number) => Promise<void>;
+  onComplete?: (requestId: number) => Promise<void>;
 }
 
 export default function VetRequestCard({
@@ -29,11 +31,13 @@ export default function VetRequestCard({
   vetLink,
   onAccept,
   onDecline,
+  onComplete,
 }: VetRequestCardProps) {
   const [timeLeft, setTimeLeft] = useState<{ minutes: number; seconds: number } | null>(null);
   const [isExpired, setIsExpired] = useState(false);
   const [isAccepting, setIsAccepting] = useState(false);
   const [isDeclining, setIsDeclining] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Calculate and update countdown timer
@@ -87,9 +91,39 @@ export default function VetRequestCard({
 
   const handleJoin = () => {
     if (vetLink) {
-      window.open(vetLink, "_blank", "width=1200,height=800");
+      // Tag the room URL with the consultation id + role so the meeting page
+      // knows which request to complete when the vet leaves the call.
+      window.open(
+        meetingLinkWithContext(vetLink, requestId, "vet"),
+        "_blank",
+        "width=1200,height=800"
+      );
     }
   };
+
+  const handleComplete = async () => {
+    if (!onComplete) return;
+    setIsCompleting(true);
+    try {
+      await onComplete(requestId);
+    } catch (error) {
+      console.error("Error completing consultation:", error);
+    } finally {
+      setIsCompleting(false);
+    }
+  };
+
+  // Button visibility matrix (admin-activated workflow):
+  //  - Accept / Decline   -> ASSIGNED (meeting not generated yet)
+  //  - Join Video Call    -> MEETING_CREATED / ACCEPTED / IN_PROGRESS with
+  //                          vet_link (meeting generated; stays visible so a
+  //                          reload or disconnect never loses the link)
+  //  - Completed/ended states render only a static badge, never action cards.
+  const isTerminal = ["COMPLETED", "EXPIRED", "DECLINED", "CANCELLED", "CALL_ENDED"].includes(status ?? "");
+  const canAcceptOrDecline = status === "ASSIGNED";
+  const isJoinable =
+    ["MEETING_CREATED", "ACCEPTED", "IN_PROGRESS"].includes(status ?? "") &&
+    !!vetLink;
 
   // If expired, show a different UI
   if (isExpired) {
@@ -100,6 +134,33 @@ export default function VetRequestCard({
           <p className="font-medium">Consultation Expired</p>
         </div>
         <p className="text-sm">This consultation request has expired and can no longer be accepted.</p>
+      </div>
+    );
+  }
+
+  // Terminal statuses replace all active buttons with a static ended badge.
+  if (isTerminal) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-foreground">Farmer Request</h3>
+            <p className="text-sm text-text-muted">Request #{requestId}</p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 dark:bg-gray-900/30 dark:text-gray-300">
+            <AlertCircle className="h-3.5 w-3.5" />
+            {status === "COMPLETED"
+              ? "Consultation Completed"
+              : status === "EXPIRED"
+              ? "Call Ended"
+              : status === "DECLINED"
+              ? "Declined"
+              : "Cancelled"}
+          </span>
+        </div>
+        <p className="text-sm text-text-muted">
+          This consultation is no longer active. The video call has been closed.
+        </p>
       </div>
     );
   }
@@ -161,49 +222,90 @@ export default function VetRequestCard({
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-3 pt-4 border-t border-border">
-        <button
-          onClick={handleDecline}
-          disabled={isDeclining || isAccepting}
-          className="flex-1 px-4 py-2.5 rounded-lg font-medium text-sm
-                     border border-border text-foreground
-                     hover:bg-secondary/50 hover:border-border/80
-                     transition-colors duration-200
-                     disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isDeclining ? (
-            <>
-              <Loader2 className="h-4 w-4 inline mr-2 animate-spin" />
-              Declining...
-            </>
-          ) : (
-            "Decline"
-          )}
-        </button>
+      <div className="space-y-3 pt-4 border-t border-border">
+        {canAcceptOrDecline ? (
+          <div className="flex gap-3">
+            <button
+              onClick={handleDecline}
+              disabled={isDeclining || isAccepting}
+              className="flex-1 px-4 py-2.5 rounded-lg font-medium text-sm
+                         border border-border text-foreground
+                         hover:bg-secondary/50 hover:border-border/80
+                         transition-colors duration-200
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDeclining ? (
+                <>
+                  <Loader2 className="h-4 w-4 inline mr-2 animate-spin" />
+                  Declining...
+                </>
+              ) : (
+                "Decline"
+              )}
+            </button>
 
-        <button
-          onClick={vetLink ? handleJoin : handleAccept}
-          disabled={isAccepting || isDeclining}
-          className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm
-                     bg-gradient-to-r from-green-600 to-emerald-600
-                     hover:from-green-700 hover:to-emerald-700
-                     text-white shadow-sm hover:shadow-md
-                     transition-all duration-200
-                     disabled:opacity-50 disabled:cursor-not-allowed
-                     active:scale-98 ${vetLink ? "ring-2 ring-emerald-300 animate-pulse" : ""}`}
-        >
-          {isAccepting ? (
-            <>
-              <Loader2 className="h-4 w-4 inline mr-2 animate-spin" />
-              Joining...
-            </>
-          ) : (
-            <>
-              {vetLink && <span className="inline-block h-2 w-2 rounded-full bg-white mr-2" />}
+            <button
+              onClick={handleAccept}
+              disabled={isAccepting || isDeclining}
+              className="flex-1 px-4 py-2.5 rounded-lg font-medium text-sm
+                         bg-gradient-to-r from-green-600 to-emerald-600
+                         hover:from-green-700 hover:to-emerald-700
+                         text-white shadow-sm hover:shadow-md
+                         transition-all duration-200
+                         disabled:opacity-50 disabled:cursor-not-allowed
+                         active:scale-98"
+            >
+              {isAccepting ? (
+                <>
+                  <Loader2 className="h-4 w-4 inline mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                "Accept"
+              )}
+            </button>
+          </div>
+        ) : isJoinable ? (
+          <>
+            <button
+              onClick={handleJoin}
+              className="flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm
+                         bg-gradient-to-r from-green-600 to-emerald-600
+                         hover:from-green-700 hover:to-emerald-700
+                         text-white shadow-sm hover:shadow-md
+                         transition-all duration-200
+                         active:scale-98 ring-2 ring-emerald-300 animate-pulse"
+            >
+              <span className="inline-block h-2 w-2 rounded-full bg-white" />
               Join Video Call
-            </>
-          )}
-        </button>
+            </button>
+
+            {onComplete && (
+              <button
+                onClick={handleComplete}
+                disabled={isCompleting}
+                className="flex w-full items-center justify-center px-4 py-2.5 rounded-lg font-medium text-sm
+                           border border-border text-foreground
+                           hover:bg-secondary/50 hover:border-border/80
+                           transition-colors duration-200
+                           disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCompleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 inline mr-2 animate-spin" />
+                    Completing...
+                  </>
+                ) : (
+                  "End Consultation & Release"
+                )}
+              </button>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-text-muted">
+            No action is available for this request in its current state.
+          </p>
+        )}
       </div>
     </div>
   );

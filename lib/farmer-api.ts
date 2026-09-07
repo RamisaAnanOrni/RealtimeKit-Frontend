@@ -263,6 +263,77 @@ export async function getConsultationStatus(
 }
 
 /**
+ * End / complete a consultation from the farmer side.
+ * POST /api/consultations/<id>/complete/ transitions the FarmerRequest to
+ * COMPLETED and its Meeting to ENDED.
+ */
+export async function completeConsultation(
+  requestId: number,
+): Promise<{ status: string; message: string; consultation_id: number }> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error(
+      "Authentication required. Please sign in with your farmer account.",
+    );
+  }
+
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_BACKEND_URL}/consultations/${requestId}/complete/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(
+      data?.detail || `Failed to complete consultation: ${response.status}`,
+    );
+  }
+  return data;
+}
+
+/**
+ * Farmer signals that they are entering the video room.
+ * POST /api/consultations/<id>/join/ transitions the request to ACCEPTED and
+ * marks the Meeting STARTED, so the join button stays visible to both sides
+ * even after a reload/reconnect (status ACCEPTED / IN_PROGRESS).
+ */
+export async function markConsultationJoined(
+  requestId: number,
+): Promise<{ status: string; message: string; consultation_id: number }> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error(
+      "Authentication required. Please sign in with your farmer account.",
+    );
+  }
+
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_BACKEND_URL}/consultations/${requestId}/join/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(
+      data?.detail || `Failed to join consultation: ${response.status}`,
+    );
+  }
+  return data;
+}
+
+/**
  * Get list of farmer's consultation requests
  */
 export async function getFarmerConsultations(): Promise<ConsultationRequest[]> {
