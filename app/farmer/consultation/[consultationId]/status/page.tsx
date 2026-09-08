@@ -22,12 +22,12 @@ export default function ConsultationStatusRoute() {
 
   if (!consultationId || isNaN(consultationId)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-[#edf4f1]">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="text-2xl font-bold text-[#063b2b]">
             Invalid Consultation ID
           </h1>
-          <p className="text-text-muted mt-2">
+          <p className="text-[#59736a] mt-2">
             The consultation ID is missing or invalid.
           </p>
         </div>
@@ -36,7 +36,7 @@ export default function ConsultationStatusRoute() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-background-light py-12 px-4">
+    <div className="min-h-screen bg-[#edf4f1] py-12 px-4">
       <div className="w-full max-w-2xl mx-auto mb-6">
         <BackButton href="/farmer/consultation" label="Back to Consultation" />
       </div>

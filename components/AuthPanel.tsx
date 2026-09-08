@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { FormEvent, useState } from "react";
 import { getStoredAuth, loginWithBackend, normalizeRole, registerWithBackend, saveAuth } from "@/lib/api";
 
@@ -125,7 +126,15 @@ export default function AuthPanel() {
               <div className="rounded-xl bg-white/75 p-4 text-[#063b2b] shadow-lg"><strong className="block text-2xl text-[#e4ad43]">10,000+</strong><span className="text-[10px]">Certified Vets</span></div>
               <div className="rounded-xl bg-white/75 p-4 text-[#063b2b] shadow-lg"><strong className="block text-2xl text-[#e4ad43]">5-Min</strong><span className="text-[10px]">Emergency SLA</span></div>
             </div>
-            <img src="/cow%20(2).jpg" alt="Veterinary care for livestock" className="h-40 w-full rounded-xl object-cover" />
+            <div className="relative h-40 w-full overflow-hidden rounded-2xl">
+              <Image
+                src="/cow%20(2).jpg"
+                alt="Veterinary care for livestock"
+                fill
+                sizes="(min-width: 1024px) 38vw, 100vw"
+                className="object-cover object-top"
+              />
+            </div>
           </div>
         </aside>
 
