@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   AlertCircle,
   Loader2,
@@ -10,7 +11,6 @@ import {
   CheckCircle2,
   Award,
   Send,
-  LogOut,
 } from "lucide-react";
 import VetRequestCard from "@/components/VetRequestCard";
 import { useAuth } from "@/components/AuthProvider";
@@ -47,6 +47,7 @@ export default function VetDashboardPage() {
 
   // Auth & profile
   const [isActive, setIsActive] = useState(true);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   // Data
   const [requests, setRequests] = useState<ConsultationRequest[]>([]);
@@ -216,7 +217,7 @@ export default function VetDashboardPage() {
 
   const handleLogout = async () => {
     await logout();
-    router.push("/auth");
+    router.push("/login");
   };
 
   const handleSubmitRx = async () => {
@@ -271,21 +272,36 @@ export default function VetDashboardPage() {
               </span>
             </div>
 
-            {/* Avatar + Logout */}
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center">
+            {/* Avatar + Profile dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setProfileOpen((v) => !v)}
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-primary transition hover:opacity-90"
+                title="Profile"
+                aria-label="Open profile"
+                aria-expanded={profileOpen}
+              >
                 <span className="text-sm font-bold text-on-primary">
                   {vetName.charAt(0).toUpperCase()}
                 </span>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-text-muted hover:text-foreground hover:bg-secondary/50 transition-colors"
-                title="Logout"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Logout</span>
               </button>
+              {profileOpen && (
+                <div className="absolute right-0 top-12 z-30 w-44 overflow-hidden rounded-xl border border-border-light bg-white shadow-lg">
+                  <Link
+                    href="/vet/profile"
+                    onClick={() => setProfileOpen(false)}
+                    className="block px-4 py-2.5 text-xs font-semibold text-primary transition hover:bg-background-alt"
+                  >
+                    My Profile
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full border-t border-border-light px-4 py-2.5 text-left text-xs font-bold text-[#C34A4A] transition hover:bg-[#FFF0F0]"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

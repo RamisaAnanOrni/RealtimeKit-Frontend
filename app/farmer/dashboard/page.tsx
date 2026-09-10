@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, ClipboardCheck, Filter, HeartPulse, Leaf, Menu, PawPrint, PhoneCall, ShieldAlert, Star, Wheat, X } from "lucide-react";
+import Link from "next/link";
+import { Bell, ClipboardCheck, Filter, HeartPulse, Leaf, Menu, PawPrint, ShieldAlert, Star, Wheat, X } from "lucide-react";
 import { fetchJson, getStoredAuth } from "@/lib/api";
 import { useRoleProtection } from "@/hooks/useRoleProtection";
 import { useAuth } from "@/components/AuthProvider";
@@ -84,10 +85,11 @@ export default function FarmerDashboardPage() {
 
   async function logout() {
     await authLogout();
-    window.location.assign("/auth");
+    window.location.assign("/login");
   }
 
   const morningText = useMemo(() => `Hello, ${dashboard.user.name}`, [dashboard.user.name]);
+  const avatarInitial = (dashboard.user.name || "").trim().charAt(0).toUpperCase() || "F";
 
   if (loadingDashboard) return <div className="flex min-h-screen items-center justify-center text-sm font-semibold text-text-secondary">Loading your farm dashboard...</div>;
 
@@ -106,13 +108,30 @@ export default function FarmerDashboardPage() {
           </nav>
           <div className="relative flex items-center gap-3">
             <button aria-label="Notifications" className="hidden rounded-full p-2 text-text-secondary hover:bg-background-alt hover:text-primary sm:block"><Bell className="h-[18px] w-[18px]" /></button>
-            <button aria-label="Open profile" onClick={() => setProfileOpen(!profileOpen)} className="hidden rounded-full p-2 text-text-secondary hover:bg-background-alt hover:text-primary sm:block"><span className="text-base">◉</span></button>
-            {profileOpen && (
-              <div className="absolute right-28 top-12 z-30 w-36 rounded-xl border border-border-light bg-white p-2 shadow-lg">
-                <button onClick={logout} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-[#C34A4A] hover:bg-[#FFF0F0]">Logout</button>
-              </div>
-            )}
-            <button onClick={() => showNotice("Emergency call requested. A care coordinator will contact you shortly.")} className="hidden items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[11px] font-bold text-white shadow-sm hover:bg-primary-light sm:flex"><PhoneCall className="h-3.5 w-3.5" /> Emergency Call</button>
+            <div className="relative">
+              <button
+                aria-label="Open profile"
+                aria-expanded={profileOpen}
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-primary text-sm font-bold text-white transition hover:opacity-90"
+                title="Profile"
+              >
+                {avatarInitial}
+              </button>
+              {profileOpen && (
+                <div className="absolute right-0 top-12 z-30 w-44 overflow-hidden rounded-xl border border-border-light bg-white shadow-lg">
+                  <Link
+                    href="/farmer/profile"
+                    onClick={() => setProfileOpen(false)}
+                    className="block px-4 py-2.5 text-xs font-semibold text-primary transition hover:bg-background-alt"
+                  >
+                    My Profile
+                  </Link>
+                  <button onClick={logout} className="w-full border-t border-border-light px-4 py-2.5 text-left text-xs font-bold text-[#C34A4A] transition hover:bg-[#FFF0F0]">Logout</button>
+                </div>
+              )}
+            </div>
+
             <button aria-label={menuOpen ? "Close menu" : "Open menu"} onClick={() => setMenuOpen(!menuOpen)} className="rounded-lg p-2 text-primary md:hidden">{menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
           </div>
         </div>
@@ -137,7 +156,7 @@ export default function FarmerDashboardPage() {
       <main className="mx-auto max-w-[1240px] px-5 pb-14 pt-10 sm:px-8 lg:px-10 lg:pt-14">
         <section id="consultation" className="mb-10 flex flex-col justify-between gap-7 lg:flex-row lg:items-end">
           <div>
-            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-teal">Tuesday, October 17, 2023</p>
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-teal">Tuesday, October 17, 2026</p>
             <h1 className="text-3xl font-bold tracking-tight text-primary sm:text-4xl">{morningText}</h1>
             <p className="mt-3 text-sm text-text-secondary">Your farm is looking healthy today. <span className="font-semibold text-primary">{dashboard.appointments} upcoming appointments.</span></p>
           </div>

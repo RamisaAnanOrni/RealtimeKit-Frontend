@@ -44,7 +44,14 @@ export default function AuthPanel() {
         // Normalize role to UPPERCASE for backend (VET or FARMER)
         const normalizedRole = role === "vet" ? "VET" : "FARMER";
         
-        const signupPayload = { phone, fullName, password, role: normalizedRole };
+        const signupPayload: Record<string, string> = { phone, fullName, password, role: normalizedRole };
+        if (normalizedRole === "VET") {
+          signupPayload.nid = (formData.get("nid") ?? "").toString().trim();
+          signupPayload.university = (formData.get("university") ?? "").toString().trim();
+          signupPayload.cgpa = (formData.get("cgpa") ?? "").toString().trim();
+          signupPayload.yearsOfExperience = (formData.get("yearsOfExperience") ?? "0").toString().trim();
+          signupPayload.licenseId = (formData.get("licenseId") ?? "").toString().trim();
+        }
         console.log("[AuthPanel] Signup Payload:", signupPayload);
         
         result = await registerWithBackend(signupPayload as any);

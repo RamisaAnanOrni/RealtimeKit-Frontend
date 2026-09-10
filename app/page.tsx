@@ -1,7 +1,22 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+
+const HERO_IMAGES = ["/cow3.jpg", "/vet.jpg", "/vet2.jpg", "/vet3.jpg"];
 
 export default function Home() {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(
+      () => setActiveIndex((index) => (index + 1) % HERO_IMAGES.length),
+      4000
+    );
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col bg-background text-on-surface">
       {/* TopNavBar */}
@@ -67,13 +82,18 @@ export default function Home() {
         {/* Hero Section */}
         <section className="relative isolate flex min-h-140 w-full items-center justify-center overflow-hidden bg-primary-dark sm:min-h-150 lg:min-h-155">
           <div className="absolute inset-0 z-0 bg-primary-dark">
-            <Image
-              src="/cow%20(2).jpg"
-              alt="Healthy brown cow on a farm"
-              fill
-              priority
-              className="object-contain object-right"
-            />
+            {HERO_IMAGES.map((src, i) => (
+              <Image
+                key={src}
+                src={src}
+                alt={`Agricore VetCare showcase ${i + 1}`}
+                fill
+                priority={i === 0}
+                className={`object-contain object-right transition-opacity duration-1000 ease-in-out ${
+                  i === activeIndex ? "opacity-100" : "opacity-0"
+                }`}
+              />
+            ))}
             <div className="absolute inset-0 bg-linear-to-r from-primary-dark via-primary/75 to-primary/15" />
           </div>
 
