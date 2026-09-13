@@ -4,7 +4,7 @@
  * NO Next.js API routes - Direct browser → Django backend only.
  */
 
-// env ফাইল না বদলে NEXT_PUBLIC_BACKEND_URL অথবা NEXT_PUBLIC_API_BASE_URL থেকে URL ধরে নিবে
+
 export const API_BASE_URL = (
   process.env.NEXT_PUBLIC_BACKEND_URL ||
   process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -168,7 +168,7 @@ export async function loginWithBackend({ username, password }: { username: strin
 }
 
 export async function registerWithBackend({ phone, fullName, password, role }: { phone: string; fullName: string; password: string; role: string }) {
-  // ডাইরেক্ট এন্ডপয়েন্ট কল
+ 
   return fetchJson<{ success?: boolean; message?: string; access?: string; refresh?: string; role?: string; username?: string; detail?: string }>(
     "/auth/signup/",
     {

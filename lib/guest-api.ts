@@ -18,6 +18,9 @@ export interface GuestSubmitResponse {
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
+const API_KEY =
+  process.env.NEXT_PUBLIC_STATIC_API_KEY || "agrivet-secret-lifetime-key-2026";
+
 if (!BASE_URL) {
   console.error(
     "NEXT_PUBLIC_API_BASE_URL is not set! Check your .env.local file."
@@ -35,7 +38,10 @@ export async function submitGuestRequest(
   const normalized = normalizePhone(phone);
   const response = await fetch(`${BASE_URL}/guest/request/`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": API_KEY,
+    },
     body: JSON.stringify({ phone: normalized, problem }),
   });
 
@@ -51,7 +57,9 @@ export async function submitGuestRequest(
 export async function getGuestRequest(
   requestId: number
 ): Promise<GuestRequestResponse> {
-  const response = await fetch(`${BASE_URL}/guest/request/${requestId}/`);
+  const response = await fetch(`${BASE_URL}/guest/request/${requestId}/`, {
+    headers: { "x-api-key": API_KEY },
+  });
 
   if (!response.ok) {
     const text = await response.text();

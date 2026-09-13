@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Clock, Video, Phone, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Clock, Video, Phone, CheckCircle2 } from "lucide-react";
 
 interface StatusCardProps {
   status: "pending" | "ready";
@@ -38,10 +38,10 @@ export default function StatusCard({
       ) : (
         <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5 text-emerald-900 dark:text-emerald-200">
           <div className="flex items-start gap-3">
-            <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-900" />
             <div>
-              <h3 className="text-base font-semibold">Doctor is Ready!</h3>
-              <p className="mt-1 text-xs text-emerald-800/80 dark:text-emerald-300/80 leading-relaxed">
+              <h3 className="text-base font-bold text-emerald-950">Doctor is Ready!</h3>
+              <p className="mt-1 text-xs leading-relaxed text-emerald-800">
                 {message || "A veterinarian is ready to start your consultation session."}
               </p>
             </div>
